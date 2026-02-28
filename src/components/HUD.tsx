@@ -1,14 +1,85 @@
+import { MAX_ARREST_ATTEMPTS } from "../game/gameState";
+
 interface HUDProps {
   clues: string[];
   modelVariant: "prompt_engineered" | "finetuned";
   onToggleModel: () => void;
+  currentDay: number;
+  totalDays: number;
+  dayProgress: number;
+  timeOfDayLabel: string;
+  dayTimeLeftSec: number;
+  arrestAttempts: number;
 }
 
-export function HUD({ clues, modelVariant, onToggleModel }: HUDProps) {
+export function HUD({
+  clues,
+  modelVariant,
+  onToggleModel,
+  currentDay,
+  totalDays,
+  dayProgress,
+  timeOfDayLabel,
+  dayTimeLeftSec,
+  arrestAttempts,
+}: HUDProps) {
+  const minutesLeft = Math.floor(dayTimeLeftSec / 60);
+  const secondsLeft = dayTimeLeftSec % 60;
+  const timeStr = `${minutesLeft}:${String(secondsLeft).padStart(2, "0")}`;
+
+  const attemptsLeft = MAX_ARREST_ATTEMPTS - arrestAttempts;
+  const progressPercent = Math.round(dayProgress * 100);
+
   return (
     <div style={styles.hud}>
+      {/* Day / time panel */}
+      <div style={styles.panel}>
+        <div style={styles.dayRow}>
+          <span style={styles.dayLabel}>Day {currentDay} of {totalDays}</span>
+          <span style={styles.timeOfDay}>{timeOfDayLabel}</span>
+        </div>
+
+        {/* Progress bar for the current day */}
+        <div style={styles.barTrack}>
+          <div
+            style={{
+              ...styles.barFill,
+              width: `${progressPercent}%`,
+              background: dayProgress > 0.8 ? "#cc4444" : dayProgress > 0.6 ? "#d4af37" : "#4a9a4a",
+            }}
+          />
+        </div>
+
+        <div style={styles.timeLeft}>
+          ⏳ {timeStr} remaining today
+        </div>
+      </div>
+
+      {/* Arrest attempts — shown once the player has at least one clue */}
+      {clues.length > 0 && (
+        <div style={styles.panel}>
+          <div style={styles.accuseTitle}>⚖️ Accusations</div>
+          <div style={styles.accuseDots}>
+            {Array.from({ length: MAX_ARREST_ATTEMPTS }).map((_, i) => (
+              <span
+                key={i}
+                style={{
+                  ...styles.dot,
+                  background: i < arrestAttempts ? "#cc4444" : "#4a9a4a",
+                }}
+              />
+            ))}
+          </div>
+          <div style={styles.accuseHint}>
+            {attemptsLeft > 0
+              ? `${attemptsLeft} attempt${attemptsLeft !== 1 ? "s" : ""} left`
+              : "No attempts left!"}
+          </div>
+        </div>
+      )}
+
       {/* Clue journal */}
-      <div style={styles.journal}>
+      <div style={styles.panel}>
         <div style={styles.journalTitle}>📜 Investigation Journal</div>
         {clues.length === 0 ? (
           <div style={styles.noClues}>No clues found yet...</div>
@@ -42,16 +113,74 @@ const styles: Record<string, React.CSSProperties> = {
     right: 16,
     display: "flex",
     flexDirection: "column",
-    gap: 12,
+    gap: 10,
     zIndex: 50,
     width: 220,
   },
-  journal: {
+  panel: {
     background: "rgba(26,18,8,0.92)",
     border: "1px solid #d4af37",
     borderRadius: 8,
     padding: 12,
     boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+  },
+  dayRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  dayLabel: {
+    color: "#d4af37",
+    fontFamily: "Georgia, serif",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  timeOfDay: {
+    color: "#e8dfc0",
+    fontSize: 12,
+    fontFamily: "Georgia, serif",
+  },
+  barTrack: {
+    height: 6,
+    background: "#2a2010",
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  barFill: {
+    height: "100%",
+    borderRadius: 3,
+    transition: "width 1s linear, background 1s ease",
+  },
+  timeLeft: {
+    color: "#a89060",
+    fontSize: 11,
+    fontFamily: "Georgia, serif",
+    textAlign: "center",
+  },
+  accuseTitle: {
+    color: "#d4af37",
+    fontFamily: "Georgia, serif",
+    fontWeight: "bold",
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  accuseDots: {
+    display: "flex",
+    gap: 6,
+    marginBottom: 4,
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: "50%",
+    border: "1px solid rgba(255,255,255,0.2)",
+  },
+  accuseHint: {
+    color: "#a89060",
+    fontSize: 11,
+    fontFamily: "Georgia, serif",
   },
   journalTitle: {
     color: "#d4af37",
@@ -61,7 +190,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 8,
   },
   noClues: { color: "#6a5a30", fontStyle: "italic", fontSize: 12 },
-  clueList: { listStyle: "none", display: "flex", flexDirection: "column", gap: 6 },
+  clueList: { listStyle: "none", display: "flex", flexDirection: "column", gap: 6, margin: 0, padding: 0 },
   clueItem: {
     color: "#e8dfc0",
     fontSize: 12,

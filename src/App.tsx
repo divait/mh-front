@@ -3,6 +3,20 @@ import Phaser from "phaser";
 import { ParisScene, ZoneClickedEvent, MAP_WIDTH, MAP_HEIGHT } from "./game/ParisScene";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { HUD } from "./components/HUD";
+import { GameOverScreen } from "./components/GameOverScreen";
+import { IntroDialogue } from "./components/IntroDialogue";
+import {
+  DAY_DURATION_MS,
+  MAX_ARREST_ATTEMPTS,
+  computeTotalDays,
+  getTimeOfDay,
+  getPhaseProgress,
+  getDayNightOverlay,
+  getDangerOverlay,
+  TIME_OF_DAY_ICONS,
+  type GamePhase,
+  type TimeOfDay,
+} from "./game/gameState";
 
 // Stable session ID for this browser tab
 const SESSION_ID = `session_${Math.random().toString(36).slice(2, 10)}`;
@@ -18,6 +32,10 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapGridRef = useRef<HTMLDivElement | null>(null);
 
+  // ── Intro state ──────────────────────────────────────────────────────────────
+  const [showIntro, setShowIntro] = useState(true);
+
+  // ── NPC / UI state ──────────────────────────────────────────────────────────
   const [activeNPC, setActiveNPC] = useState<ActiveNPC | null>(null);
   const [personGreeting, setPersonGreeting] = useState<string | null>(null);
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -27,6 +45,138 @@ export default function App() {
     "prompt_engineered"
   );
 
+  // ── Game state ───────────────────────────────────────────────────────────────
+  const [gamePhase, setGamePhase] = useState<GamePhase>("playing");
+  const [loseReason, setLoseReason] = useState<"time" | "attempts" | null>(null);
+  const [currentDay, setCurrentDay] = useState(1);
+  const [totalDays, setTotalDays] = useState(3);
+  const [dayElapsedMs, setDayElapsedMs] = useState(0);
+  const [arrestAttempts, setArrestAttempts] = useState(0);
+  const [questTitle, setQuestTitle] = useState("The Stolen Mona Lisa");
+  const [questSolution, setQuestSolution] = useState<Record<string, string> | null>(null);
+
+  // Refs for values used inside setInterval (avoid stale closure)
+  const gamePhaseRef = useRef<GamePhase>("playing");
+  const currentDayRef = useRef(1);
+  const totalDaysRef = useRef(3);
+  const dayElapsedMsRef = useRef(0);
+  const timerPausedRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => { gamePhaseRef.current = gamePhase; }, [gamePhase]);
+  useEffect(() => { currentDayRef.current = currentDay; }, [currentDay]);
+  useEffect(() => { totalDaysRef.current = totalDays; }, [totalDays]);
+  useEffect(() => { dayElapsedMsRef.current = dayElapsedMs; }, [dayElapsedMs]);
+
+  // Pause timer whenever a panel is open or intro is showing
+  useEffect(() => {
+    timerPausedRef.current = activeNPC !== null || isMapOpen || showIntro;
+  }, [activeNPC, isMapOpen, showIntro]);
+
+  // ── Fetch quest on mount ─────────────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchQuest() {
+      try {
+        const res = await fetch(`/quest/session/${SESSION_ID}`);
+        if (res.ok) {
+          const data = await res.json();
+          const clueCount: number = data.clues?.length ?? 6;
+          setTotalDays(computeTotalDays(clueCount));
+          totalDaysRef.current = computeTotalDays(clueCount);
+          if (data.title) setQuestTitle(data.title);
+        }
+      } catch {
+        // Silently fall back to defaults (QUEST_0 has 6 clues → 3 days)
+      }
+    }
+    fetchQuest();
+  }, []);
+
+  // ── Game timer (1-second tick) ───────────────────────────────────────────────
+  useEffect(() => {
+    const TICK_MS = 1000;
+    const id = setInterval(() => {
+      if (timerPausedRef.current) return;
+      if (gamePhaseRef.current !== "playing") return;
+
+      const nextElapsed = dayElapsedMsRef.current + TICK_MS;
+
+      if (nextElapsed >= DAY_DURATION_MS) {
+        // Day is over
+        if (currentDayRef.current < totalDaysRef.current) {
+          // Advance to next day
+          const nextDay = currentDayRef.current + 1;
+          currentDayRef.current = nextDay;
+          dayElapsedMsRef.current = 0;
+          setCurrentDay(nextDay);
+          setDayElapsedMs(0);
+
+          // Update Phaser title
+          const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+          scene?.setDayLabel(nextDay);
+        } else {
+          // Out of days → lose
+          gamePhaseRef.current = "lost_time";
+          setGamePhase("lost_time");
+          setLoseReason("time");
+        }
+      } else {
+        dayElapsedMsRef.current = nextElapsed;
+        setDayElapsedMs(nextElapsed);
+
+        // Update Phaser day/night overlay
+        const dayProgress = nextElapsed / DAY_DURATION_MS;
+        const phase = getTimeOfDay(dayProgress);
+        const phaseProgress = getPhaseProgress(dayProgress);
+        const timeLeftSec = Math.ceil((DAY_DURATION_MS - nextElapsed) / 1000);
+        const danger = getDangerOverlay(currentDayRef.current, totalDaysRef.current, timeLeftSec);
+        const { color, alpha } = danger ?? getDayNightOverlay(phase, phaseProgress);
+        const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+        scene?.setDayNightOverlay(color, alpha);
+      }
+    }, TICK_MS);
+
+    return () => clearInterval(id);
+  }, []); // runs once; uses refs to avoid stale closures
+
+  // ── Derived time-of-day values for HUD ──────────────────────────────────────
+  const dayProgress = dayElapsedMs / DAY_DURATION_MS;
+  const timeOfDay: TimeOfDay = getTimeOfDay(dayProgress);
+  const timeOfDayLabel = `${TIME_OF_DAY_ICONS[timeOfDay]} ${timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)}`;
+  const dayTimeLeftSec = Math.max(0, Math.ceil((DAY_DURATION_MS - dayElapsedMs) / 1000));
+
+  // ── Intro complete handler ───────────────────────────────────────────────────
+  const handleIntroComplete = useCallback((title: string, _firstLead: string) => {
+    if (title) setQuestTitle(title);
+    setShowIntro(false);
+    // Re-enable movement now that the intro is dismissed
+    const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+    scene?.setMovementEnabled(true);
+  }, []);
+
+  // ── Arrest outcome handler ───────────────────────────────────────────────────
+  const handleArrestAttempt = useCallback(
+    (result: "success" | "failure", solution?: Record<string, string>) => {
+      if (result === "success") {
+        if (solution) setQuestSolution(solution);
+        setGamePhase("won");
+        gamePhaseRef.current = "won";
+        setActiveNPC(null);
+      } else {
+        const next = arrestAttempts + 1;
+        setArrestAttempts(next);
+        if (next >= MAX_ARREST_ATTEMPTS) {
+          setGamePhase("lost_attempts");
+          gamePhaseRef.current = "lost_attempts";
+          setLoseReason("attempts");
+          setActiveNPC(null);
+        }
+      }
+    },
+    [arrestAttempts]
+  );
+
+  // ── Phaser / React bridge ────────────────────────────────────────────────────
   const setSceneMovement = useCallback((enabled: boolean) => {
     const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
     scene?.setMovementEnabled(enabled);
@@ -45,6 +195,7 @@ export default function App() {
     setClues((prev) => (prev.includes(clue) ? prev : [...prev, clue]));
   }
 
+  // ── Keyboard dismiss for overlays ────────────────────────────────────────────
   useEffect(() => {
     if (!personGreeting && !isMapOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -57,6 +208,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [personGreeting, isMapOpen]);
 
+  // ── Phaser game init ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
 
@@ -75,6 +227,13 @@ export default function App() {
       callbacks: {
         preBoot: (game) => {
           game.scene.start("ParisScene", { onZoneClicked: handleZoneClicked });
+        },
+        postBoot: (game) => {
+          // Disable movement until the intro dialogue is dismissed
+          setTimeout(() => {
+            const scene = game.scene.getScene("ParisScene") as ParisScene | null;
+            scene?.setMovementEnabled(false);
+          }, 500);
         },
       },
     });
@@ -122,6 +281,12 @@ export default function App() {
         onToggleModel={() =>
           setModelVariant((v) => (v === "prompt_engineered" ? "finetuned" : "prompt_engineered"))
         }
+        currentDay={currentDay}
+        totalDays={totalDays}
+        dayProgress={dayProgress}
+        timeOfDayLabel={timeOfDayLabel}
+        dayTimeLeftSec={dayTimeLeftSec}
+        arrestAttempts={arrestAttempts}
       />
 
       {activeNPC && activeNPC.category !== "person" && (
@@ -132,6 +297,10 @@ export default function App() {
           modelVariant={modelVariant}
           onClose={() => { setActiveNPC(null); setSceneMovement(true); }}
           onClueDiscovered={handleClueDiscovered}
+          isInspector={activeNPC.id === "inspector"}
+          arrestAttempts={arrestAttempts}
+          clues={clues}
+          onArrestAttempt={handleArrestAttempt}
         />
       )}
 
@@ -287,6 +456,24 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {gamePhase !== "playing" && (
+        <GameOverScreen
+          phase={gamePhase}
+          loseReason={loseReason}
+          questTitle={questTitle}
+          questSolution={questSolution}
+          cluesFound={clues.length}
+          totalDays={totalDays}
+        />
+      )}
+
+      {showIntro && gamePhase === "playing" && (
+        <IntroDialogue
+          sessionId={SESSION_ID}
+          onComplete={handleIntroComplete}
+        />
       )}
     </>
   );

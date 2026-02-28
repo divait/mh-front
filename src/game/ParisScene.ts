@@ -338,6 +338,8 @@ export class ParisScene extends Phaser.Scene {
   private walls: WallRect[] = [];
   private pendingInteraction: PendingInteraction | null = null;
   private indicatorTween: Phaser.Tweens.Tween | null = null;
+  private dayNightOverlay!: Phaser.GameObjects.Rectangle;
+  private titleText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: "ParisScene" });
@@ -368,6 +370,18 @@ export class ParisScene extends Phaser.Scene {
       this.input.keyboard.enabled = false;
       this.input.keyboard.disableGlobalCapture();
     }
+  }
+
+  /** Update the day/night overlay color and alpha (called from React each second). */
+  setDayNightOverlay(color: number, alpha: number) {
+    if (!this.dayNightOverlay) return;
+    this.dayNightOverlay.setFillStyle(color, alpha);
+  }
+
+  /** Update the title text to reflect the current day (called from React). */
+  setDayLabel(day: number) {
+    if (!this.titleText) return;
+    this.titleText.setText(`⚜  Paris, 1900  —  Day ${day}  ⚜`);
   }
 
   preload() {
@@ -403,7 +417,7 @@ export class ParisScene extends Phaser.Scene {
 
     // Title and subtitle — fixed to camera so always visible
     const cam = this.cameras.main;
-    this.add
+    this.titleText = this.add
       .text(cam.width / 2, 30, "⚜  Paris, 1900  ⚜", {
         fontSize: "22px",
         color: "#d4af37",
@@ -424,6 +438,13 @@ export class ParisScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(1000);
+
+    // Day/night overlay — full-screen rectangle fixed to camera, updated from React
+    this.dayNightOverlay = this.add
+      .rectangle(0, 0, cam.width, cam.height, 0x112244, 0)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(9999);
 
     // Keyboard input
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -485,7 +506,13 @@ export class ParisScene extends Phaser.Scene {
       PLAYER_WIDTH,
       PLAYER_HEIGHT,
     );
-    this.player.setPosition(MAP_WIDTH / 2, MAP_HEIGHT / 2);
+    // Spawn next to the inspector (Préfecture, row 3 col 0, spans 2.5 cells)
+    // Inspector zone: x=60, y=CELL_H*3+60, width=CELL_W*2.5-120
+    // Stand just outside the bottom door, centered on the building
+    const inspectorZone = ZONES.find((z) => z.id === "inspector")!;
+    const spawnX = inspectorZone.x + inspectorZone.width / 2;
+    const spawnY = inspectorZone.y + inspectorZone.height + DOOR_WIDTH;
+    this.player.setPosition(spawnX, spawnY);
     this.children.bringToTop(this.player);
 
     // Camera follow player
