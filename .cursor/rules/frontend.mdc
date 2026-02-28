@@ -1,9 +1,7 @@
 ---
 description: Frontend rules — React, Phaser 3, TypeScript, Vite. Apply when editing files under frontend/
-globs: ["frontend/**"]
 alwaysApply: false
 ---
-
 # Frontend Rules
 
 ## Runtime & Dependencies
