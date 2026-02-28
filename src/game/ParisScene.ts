@@ -1,5 +1,8 @@
 import Phaser from "phaser";
 
+const TILE_URL = new URL("../assets/tile.png", import.meta.url).href;
+const GRASS_URL = new URL("../assets/grass.png", import.meta.url).href;
+
 // Resolve baker idle frame URLs at build time via Vite's import.meta.url pattern
 const BAKER_FRAMES: string[] = [
   new URL("../assets/baker/idle/frame_000.png", import.meta.url).href,
@@ -331,6 +334,8 @@ export class ParisScene extends Phaser.Scene {
   }
 
   preload() {
+    this.load.image("tile", TILE_URL);
+    this.load.image("grass", GRASS_URL);
     BAKER_FRAMES.forEach((url, i) => {
       this.load.image(`baker_idle_${i}`, url);
     });
@@ -340,24 +345,10 @@ export class ParisScene extends Phaser.Scene {
     // Camera bounds (no physics plugin — player movement is manual)
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-    // Background — cobblestone Paris streets
-    this.add.rectangle(
-      MAP_WIDTH / 2,
-      MAP_HEIGHT / 2,
-      MAP_WIDTH,
-      MAP_HEIGHT,
-      0x2a2015,
-    );
-
-    // Ground grid (stylized cobblestones)
-    const graphics = this.add.graphics();
-    graphics.lineStyle(1, 0x3a3020, 0.4);
-    for (let x = 0; x <= MAP_WIDTH; x += 40) {
-      graphics.lineBetween(x, 0, x, MAP_HEIGHT);
-    }
-    for (let y = 0; y <= MAP_HEIGHT; y += 40) {
-      graphics.lineBetween(0, y, MAP_WIDTH, y);
-    }
+    // Background — cobblestone tile texture tiled across the full map
+    this.add
+      .tileSprite(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, "tile")
+      .setDepth(-1);
 
     // Map boundary (subtle vignette)
     const border = this.add.graphics();
@@ -500,16 +491,18 @@ export class ParisScene extends Phaser.Scene {
       const w = CELL_W * colSpan - 80;
       const h = CELL_H * rowSpan - 80;
 
-      decorGraphics.fillStyle(0x1a3a1a, 0.3);
-      decorGraphics.fillRect(x, y, w, h);
-      decorGraphics.lineStyle(1, 0x2a4a2a, 0.5);
+      this.add.tileSprite(x + w / 2, y + h / 2, w, h, "grass");
+
+      decorGraphics.lineStyle(2, 0x2a4a2a, 0.6);
       decorGraphics.strokeRect(x, y, w, h);
 
       this.add
         .text(x + w / 2, y + h / 2, "Park (walkable)", {
           fontSize: "16px",
-          color: "#4a6a4a",
+          color: "#c8f0c8",
           fontFamily: "Georgia, serif",
+          stroke: "#1a3a1a",
+          strokeThickness: 2,
         })
         .setOrigin(0.5);
     };
