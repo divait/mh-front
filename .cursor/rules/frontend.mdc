@@ -1,0 +1,64 @@
+---
+description: Frontend rules — React, Phaser 3, TypeScript, Vite. Apply when editing files under frontend/
+globs: ["frontend/**"]
+alwaysApply: false
+---
+
+# Frontend Rules
+
+## Runtime & Dependencies
+- Package manager: **pnpm only** — never use `npm` or `yarn`
+- Add a package: `pnpm add <package>` or `pnpm add -D <package>` for dev
+- Run dev server: `pnpm dev` (Vite, port 5173)
+- Build: `pnpm build`
+
+## Stack
+- **React 18** with hooks only — no class components
+- **TypeScript** strict mode — no `any`, no `// @ts-ignore`
+- **Phaser 3** for the game canvas (`frontend/src/game/`)
+- **Vite** as bundler — config in `frontend/vite.config.ts`
+- Inline styles (`style={{...}}`) for component-level styling — no CSS modules, no Tailwind (not installed)
+
+## Project Structure
+```
+frontend/src/
+  game/           Phaser scenes (ParisScene.ts and future scenes)
+  components/     React UI components (DialoguePanel, HUD, etc.)
+  assets/         Static assets
+  App.tsx         Root — mounts Phaser canvas + React overlay
+  main.tsx        Entry point
+```
+
+## Phaser / React Bridge
+- Phaser runs in a `<div ref={containerRef}>` — the canvas is owned by Phaser, not React
+- Communication from Phaser → React: callbacks passed via `scene.init(data)` (e.g. `onZoneClicked`)
+- Communication from React → Phaser: use `gameRef.current.scene.getScene("SceneName")` if needed
+- Never import React inside Phaser scene files — keep them framework-agnostic
+- Phaser game instance is created once in a `useEffect` with an empty dep array and destroyed on cleanup
+
+## NPC Zone System (`ParisScene.ts`)
+- `ZoneId` must cover all **6 agent NPCs**: `"baker" | "guard" | "tavern_keeper" | "cabaret_dancer" | "inspector" | "artist"`
+- Person NPCs (`"passerby" | "shopkeeper" | "flaneur"`) are a separate type — clicking them shows a floating bubble, NOT the `DialoguePanel`
+- Zone border colours come from `NPC_COLORS` (fetched from `GET /npcs` or hardcoded constants matching backend):
+  - `original` NPCs: blue `0x4A6FA5`
+  - `belle_epoque` NPCs: gold `0xD4AF37`
+  - `person` NPCs: grey `0x888888`
+- Player interacts via **proximity + `E` key** (preferred) or click — both should work
+
+## Dialogue Panel (`DialoguePanel.tsx`)
+- Only renders for **agent NPCs** — never for Person NPCs
+- Calls `POST /dialogue/` — never calls Mistral directly from the frontend
+- Request shape: `{ session_id, npc_id, player_message, model_variant }`
+- `model_variant` comes from HUD state: `"prompt_engineered"` (default) or `"finetuned"`
+- NPC secrets are never available in the frontend — only surface hints via `/quest`
+- `CLUE_TRIGGERS` must cover all 6 agent NPCs — add entries when adding NPCs
+
+## API Calls
+- All backend calls go through Vite proxy (`/dialogue`, `/health`, `/npcs`, `/quest` → `http://localhost:8000`)
+- Never hardcode `http://localhost:8000` in fetch calls — use relative paths
+- Always handle loading state and error state in components that call the API
+
+## HUD (`HUD.tsx`)
+- Clue journal shows clues discovered during the session
+- Model variant toggle switches between `"prompt_engineered"` and `"finetuned"` — this is for the W&B A/B demo
+- Keep HUD non-blocking — it must not interfere with Phaser input events
