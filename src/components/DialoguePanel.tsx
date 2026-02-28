@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, FormEvent } from "react";
 import { MAX_ARREST_ATTEMPTS } from "../game/gameState";
+import type { NpcClues } from "../App";
 
 interface Message {
   role: "player" | "npc";
@@ -12,10 +13,10 @@ interface DialoguePanelProps {
   sessionId: string;
   modelVariant: "prompt_engineered" | "finetuned";
   onClose: () => void;
-  onClueDiscovered: (clue: string) => void;
+  onClueDiscovered: (npcId: string, npcName: string, keyword: string) => void;
   isInspector?: boolean;
   arrestAttempts?: number;
-  clues?: string[];
+  clues?: Record<string, NpcClues>;
   onArrestAttempt?: (result: "success" | "failure", solution?: Record<string, string>) => void;
 }
 
@@ -47,7 +48,7 @@ export function DialoguePanel({
   onClueDiscovered,
   isInspector = false,
   arrestAttempts = 0,
-  clues = [],
+  clues = {},
   onArrestAttempt,
 }: DialoguePanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -95,13 +96,12 @@ export function DialoguePanel({
 
       setMessages((prev) => [...prev, { role: "npc", content: reply }]);
 
-      // Check for clue keywords in the reply
+      // Check for clue keywords in the reply — report ALL matches (grouped in App)
       const triggers = CLUE_TRIGGERS[npcId] ?? [];
       const replyLower = reply.toLowerCase();
       for (const trigger of triggers) {
         if (replyLower.includes(trigger)) {
-          onClueDiscovered(`[${npcName}] "${trigger}" mentioned`);
-          break;
+          onClueDiscovered(npcId, npcName, trigger);
         }
       }
     } catch {
@@ -130,7 +130,11 @@ export function DialoguePanel({
 
     setAccuseLoading(true);
 
-    const attachedClues = clues.filter((_, i) => selectedClues.has(i));
+    // Flatten Record<npcId, NpcClues> → one string per NPC for evidence summary
+    const clueLines = Object.values(clues).map(
+      ({ name, keywords }) => `[${name}] ${keywords.join(", ")}`
+    );
+    const attachedClues = clueLines.filter((_, i) => selectedClues.has(i));
     const evidenceSummary =
       attachedClues.length > 0
         ? `\n\nEvidence I have gathered:\n${attachedClues.map((c) => `- ${c}`).join("\n")}`
@@ -277,11 +281,11 @@ export function DialoguePanel({
               disabled={accuseLoading}
             />
 
-            {clues.length > 0 && (
+            {Object.keys(clues).length > 0 && (
               <div style={styles.evidenceSection}>
                 <div style={styles.evidenceTitle}>Attach evidence from your journal:</div>
                 <div style={styles.clueCheckboxes}>
-                  {clues.map((clue, i) => (
+                  {Object.values(clues).map(({ name, keywords }, i) => (
                     <label key={i} style={styles.clueCheckboxLabel}>
                       <input
                         type="checkbox"
@@ -289,7 +293,9 @@ export function DialoguePanel({
                         onChange={() => toggleClue(i)}
                         style={{ marginRight: 6 }}
                       />
-                      <span style={styles.clueCheckboxText}>{clue}</span>
+                      <span style={styles.clueCheckboxText}>
+                        <strong>[{name}]</strong> {keywords.join(", ")}
+                      </span>
                     </label>
                   ))}
                 </div>

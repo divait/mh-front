@@ -27,6 +27,11 @@ interface ActiveNPC {
   category: "original" | "belle_epoque" | "person";
 }
 
+export interface NpcClues {
+  name: string;
+  keywords: string[];
+}
+
 export default function App() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,7 +45,7 @@ export default function App() {
   const [personGreeting, setPersonGreeting] = useState<string | null>(null);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [playerPos, setPlayerPos] = useState<{ x: number; y: number } | null>(null);
-  const [clues, setClues] = useState<string[]>([]);
+  const [clues, setClues] = useState<Record<string, NpcClues>>({});
   const [modelVariant, setModelVariant] = useState<"prompt_engineered" | "finetuned">(
     "prompt_engineered"
   );
@@ -191,8 +196,12 @@ export default function App() {
     setSceneMovement(false);
   }, [setSceneMovement]);
 
-  function handleClueDiscovered(clue: string) {
-    setClues((prev) => (prev.includes(clue) ? prev : [...prev, clue]));
+  function handleClueDiscovered(npcId: string, npcName: string, keyword: string) {
+    setClues((prev) => {
+      const existing = prev[npcId] ?? { name: npcName, keywords: [] };
+      if (existing.keywords.includes(keyword)) return prev;
+      return { ...prev, [npcId]: { name: npcName, keywords: [...existing.keywords, keyword] } };
+    });
   }
 
   // ── Keyboard dismiss for overlays ────────────────────────────────────────────
@@ -464,7 +473,7 @@ export default function App() {
           loseReason={loseReason}
           questTitle={questTitle}
           questSolution={questSolution}
-          cluesFound={clues.length}
+          cluesFound={Object.keys(clues).length}
           totalDays={totalDays}
         />
       )}

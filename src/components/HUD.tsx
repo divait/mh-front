@@ -1,7 +1,8 @@
 import { MAX_ARREST_ATTEMPTS } from "../game/gameState";
+import type { NpcClues } from "../App";
 
 interface HUDProps {
-  clues: string[];
+  clues: Record<string, NpcClues>;
   modelVariant: "prompt_engineered" | "finetuned";
   onToggleModel: () => void;
   currentDay: number;
@@ -56,7 +57,7 @@ export function HUD({
       </div>
 
       {/* Arrest attempts — shown once the player has at least one clue */}
-      {clues.length > 0 && (
+      {Object.keys(clues).length > 0 && (
         <div style={styles.panel}>
           <div style={styles.accuseTitle}>⚖️ Accusations</div>
           <div style={styles.accuseDots}>
@@ -81,13 +82,14 @@ export function HUD({
       {/* Clue journal */}
       <div style={styles.panel}>
         <div style={styles.journalTitle}>📜 Investigation Journal</div>
-        {clues.length === 0 ? (
+        {Object.keys(clues).length === 0 ? (
           <div style={styles.noClues}>No clues found yet...</div>
         ) : (
           <ul style={styles.clueList}>
-            {clues.map((clue, i) => (
-              <li key={i} style={styles.clueItem}>
-                {clue}
+            {Object.entries(clues).map(([npcId, { name, keywords }]) => (
+              <li key={npcId} style={styles.clueItem}>
+                <span style={styles.clueNpc}>[{name}]</span>
+                <span style={styles.clueKeywords}>{keywords.join(", ")}</span>
               </li>
             ))}
           </ul>
@@ -192,12 +194,24 @@ const styles: Record<string, React.CSSProperties> = {
   noClues: { color: "#6a5a30", fontStyle: "italic", fontSize: 12 },
   clueList: { listStyle: "none", display: "flex", flexDirection: "column", gap: 6, margin: 0, padding: 0 },
   clueItem: {
-    color: "#e8dfc0",
     fontSize: 12,
     fontFamily: "Georgia, serif",
     paddingLeft: 12,
     borderLeft: "2px solid #d4af37",
-    lineHeight: 1.4,
+    lineHeight: 1.5,
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+  },
+  clueNpc: {
+    color: "#d4af37",
+    fontWeight: "bold",
+    fontSize: 11,
+  },
+  clueKeywords: {
+    color: "#e8dfc0",
+    fontStyle: "italic",
+    fontSize: 11,
   },
   modelToggle: {
     background: "rgba(26,18,8,0.92)",
