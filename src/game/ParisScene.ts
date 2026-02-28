@@ -25,6 +25,13 @@ const GUARD_FRAMES: string[] = [
   new URL("../assets/guard/idle/frame_003.png", import.meta.url).href,
 ];
 
+const DANCER_FRAMES: string[] = [
+  new URL("../assets/dancer/idle/frame_000.png", import.meta.url).href,
+  new URL("../assets/dancer/idle/frame_001.png", import.meta.url).href,
+  new URL("../assets/dancer/idle/frame_002.png", import.meta.url).href,
+  new URL("../assets/dancer/idle/frame_003.png", import.meta.url).href,
+];
+
 export type ZoneId =
   | "baker"
   | "guard"
@@ -375,6 +382,9 @@ export class ParisScene extends Phaser.Scene {
     GUARD_FRAMES.forEach((url, i) => {
       this.load.image(`guard_idle_${i}`, url);
     });
+    DANCER_FRAMES.forEach((url, i) => {
+      this.load.image(`dancer_idle_${i}`, url);
+    });
   }
 
   create() {
@@ -442,6 +452,12 @@ export class ParisScene extends Phaser.Scene {
     this.anims.create({
       key: "guard_idle",
       frames: GUARD_FRAMES.map((_, i) => ({ key: `guard_idle_${i}` })),
+      frameRate: 6,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: "dancer_idle",
+      frames: DANCER_FRAMES.map((_, i) => ({ key: `dancer_idle_${i}` })),
       frameRate: 6,
       repeat: -1,
     });
@@ -810,6 +826,11 @@ export class ParisScene extends Phaser.Scene {
       sprite.setScale(1.6);
       sprite.play("guard_idle");
       npcVisual = sprite;
+    } else if (zone.id === "cabaret_dancer") {
+      const sprite = this.add.sprite(npcCX, npcCY, "dancer_idle_0");
+      sprite.setScale(1.6);
+      sprite.play("dancer_idle");
+      npcVisual = sprite;
     } else {
       const g = this.add.graphics();
       g.fillStyle(zone.category === "person" ? 0x888888 : zone.borderColor, 1);
@@ -830,14 +851,17 @@ export class ParisScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
+    const isSprite =
+      zone.id === "baker" ||
+      zone.id === "tavern_keeper" ||
+      zone.id === "guard" ||
+      zone.id === "cabaret_dancer";
+
     // NPC name below sprite
     const npcName = this.add
       .text(
         npcCX,
-        npcCY +
-          (zone.id === "baker" || zone.id === "tavern_keeper" || zone.id === "guard"
-            ? 40
-            : NPC_H / 2 + 14),
+        npcCY + (isSprite ? 40 : NPC_H / 2 + 14),
         zone.npcName,
         {
           fontSize: "11px",
@@ -849,8 +873,6 @@ export class ParisScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
 
     // Invisible hit zone over the NPC sprite (slightly larger for easier clicking)
-    const isSprite =
-      zone.id === "baker" || zone.id === "tavern_keeper" || zone.id === "guard";
     const hitW = isSprite ? 52 : NPC_W + 16;
     const hitH = isSprite ? 80 : NPC_H + 30;
     const hitArea = this.add
