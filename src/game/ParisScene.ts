@@ -347,6 +347,22 @@ export class ParisScene extends Phaser.Scene {
     };
   }
 
+  /**
+   * Enable or disable player movement input.
+   * Call with `false` when a chat panel is open so WASD/Space are not consumed
+   * by Phaser and can be typed freely in the chat input.
+   */
+  setMovementEnabled(enabled: boolean) {
+    if (!this.input.keyboard) return;
+    if (enabled) {
+      this.input.keyboard.enabled = true;
+      this.input.keyboard.enableGlobalCapture();
+    } else {
+      this.input.keyboard.enabled = false;
+      this.input.keyboard.disableGlobalCapture();
+    }
+  }
+
   preload() {
     this.load.image("tile", TILE_URL);
     this.load.image("grass", GRASS_URL);

@@ -27,13 +27,19 @@ export default function App() {
     "prompt_engineered"
   );
 
+  const setSceneMovement = useCallback((enabled: boolean) => {
+    const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+    scene?.setMovementEnabled(enabled);
+  }, []);
+
   const handleZoneClicked = useCallback((event: ZoneClickedEvent) => {
     if (event.category === "person") {
       setPersonGreeting(event.greeting ?? "");
       return;
     }
     setActiveNPC({ id: event.npcId, name: event.npcName, category: event.category });
-  }, []);
+    setSceneMovement(false);
+  }, [setSceneMovement]);
 
   function handleClueDiscovered(clue: string) {
     setClues((prev) => (prev.includes(clue) ? prev : [...prev, clue]));
@@ -124,7 +130,7 @@ export default function App() {
           npcName={activeNPC.name}
           sessionId={SESSION_ID}
           modelVariant={modelVariant}
-          onClose={() => setActiveNPC(null)}
+          onClose={() => { setActiveNPC(null); setSceneMovement(true); }}
           onClueDiscovered={handleClueDiscovered}
         />
       )}
