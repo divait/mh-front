@@ -60,6 +60,7 @@ export default function App() {
       height: window.innerHeight,
       backgroundColor: "#1a1208",
       parent: containerRef.current,
+      pixelArt: true,
       scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH,
