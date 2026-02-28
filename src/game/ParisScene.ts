@@ -338,15 +338,6 @@ export class ParisScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0);
 
-    // Player — colored rectangle
-    this.player = this.add.graphics();
-    this.player.fillStyle(PLAYER_COLOR, 1);
-    this.player.fillRect(-PLAYER_WIDTH / 2, -PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT);
-    this.player.setPosition(MAP_WIDTH / 2, MAP_HEIGHT / 2);
-
-    // Camera follow player
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-
     // Keyboard input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = {
@@ -361,6 +352,19 @@ export class ParisScene extends Phaser.Scene {
 
     // Build decorative "House" and "Park" zones based on reference grid
     this.createDecorativeZones();
+
+    // Player — created last so it renders on top of all buildings and walls
+    this.player = this.add.graphics();
+    this.player.fillStyle(PLAYER_COLOR, 1);
+    this.player.fillRect(-PLAYER_WIDTH / 2, -PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT);
+    // Outline so the player stands out against any background
+    this.player.lineStyle(2, 0x1a1208, 1);
+    this.player.strokeRect(-PLAYER_WIDTH / 2, -PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT);
+    this.player.setPosition(MAP_WIDTH / 2, MAP_HEIGHT / 2);
+    this.children.bringToTop(this.player);
+
+    // Camera follow player
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
   }
 
   private drawWalls(wallRects: WallRect[]) {
