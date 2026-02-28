@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Phaser from "phaser";
-import { ParisScene, ZoneClickedEvent } from "./game/ParisScene";
+import { ParisScene, ZoneClickedEvent, MAP_WIDTH, MAP_HEIGHT } from "./game/ParisScene";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { HUD } from "./components/HUD";
 
@@ -16,10 +16,12 @@ interface ActiveNPC {
 export default function App() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapGridRef = useRef<HTMLDivElement | null>(null);
 
   const [activeNPC, setActiveNPC] = useState<ActiveNPC | null>(null);
   const [personGreeting, setPersonGreeting] = useState<string | null>(null);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [playerPos, setPlayerPos] = useState<{ x: number; y: number } | null>(null);
   const [clues, setClues] = useState<string[]>([]);
   const [modelVariant, setModelVariant] = useState<"prompt_engineered" | "finetuned">(
     "prompt_engineered"
@@ -98,7 +100,11 @@ export default function App() {
           padding: "10px 16px",
           boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
         }}
-        onClick={() => setIsMapOpen(true)}
+        onClick={() => {
+          const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+          if (scene) setPlayerPos(scene.getPlayerPosition());
+          setIsMapOpen(true);
+        }}
       >
         🗺️ City Map
       </button>
@@ -209,17 +215,18 @@ export default function App() {
 
             {/* Map Grid Visualization */}
             <div
+              ref={(el) => { mapGridRef.current = el; }}
               style={{
                 flex: 1,
-                background: "#2a2015",
+                background: "#4a3e28",
                 borderRadius: 8,
                 position: "relative",
-                border: "1px solid #3a3020",
+                border: "2px solid #5a4e38",
                 display: "grid",
                 gridTemplateColumns: "repeat(5, 1fr)",
                 gridTemplateRows: "repeat(4, 1fr)",
-                gap: 4,
-                padding: 4,
+                gap: 14,
+                padding: 14,
               }}
             >
               {/* Row 0 */}
@@ -245,6 +252,27 @@ export default function App() {
               <div style={{ ...mapStyles.cell, gridColumn: "span 3" }}>⚖️ Prefecture</div>
               {/* Col 3 is Large House span */}
               <div style={mapStyles.cell}>🎨 Atelier</div>
+
+              {/* Player position dot */}
+              {playerPos && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `${(playerPos.x / MAP_WIDTH) * 100}%`,
+                    top: `${(playerPos.y / MAP_HEIGHT) * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                    width: 14,
+                    height: 14,
+                    borderRadius: "50%",
+                    background: "#e8d5a3",
+                    border: "2px solid #fff",
+                    boxShadow: "0 0 8px 3px rgba(232,213,163,0.7)",
+                    zIndex: 10,
+                    pointerEvents: "none",
+                  }}
+                  title="You are here"
+                />
+              )}
             </div>
 
             <div style={{ marginTop: 16, color: "#a89060", fontSize: 13, fontStyle: "italic" }}>

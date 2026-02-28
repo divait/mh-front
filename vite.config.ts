@@ -9,6 +9,7 @@ export default defineConfig({
       "/dialogue": "http://localhost:8000",
       "/health": "http://localhost:8000",
       "/npcs": "http://localhost:8000",
+      "/quest": "http://localhost:8000",
     },
   },
 });

@@ -201,11 +201,86 @@ const ZONES: Zone[] = [
   },
 ];
 
+export { MAP_WIDTH, MAP_HEIGHT };
+
+// Axis-aligned rectangle used for wall collision
+interface WallRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const WALL_THICKNESS = 16;
+const DOOR_WIDTH = 60;
+
+/**
+ * Build wall segments for a rectangular building.
+ * The door is a gap on the specified side (default: "bottom", centered).
+ * Returns up to 8 thin wall rects (2 per side, split around the door on the door side).
+ */
+function buildWalls(
+  bx: number, by: number, bw: number, bh: number,
+  doorSide: "top" | "bottom" | "left" | "right" = "bottom"
+): WallRect[] {
+  const t = WALL_THICKNESS;
+  const d = DOOR_WIDTH;
+  const walls: WallRect[] = [];
+
+  // Helper: full side segments
+  const top    = (): WallRect => ({ x: bx,           y: by,           w: bw, h: t });
+  const bottom = (): WallRect => ({ x: bx,           y: by + bh - t,  w: bw, h: t });
+  const left   = (): WallRect => ({ x: bx,           y: by,           w: t,  h: bh });
+  const right  = (): WallRect => ({ x: bx + bw - t,  y: by,           w: t,  h: bh });
+
+  // Split a horizontal wall around a centered door gap
+  const splitH = (wx: number, wy: number, ww: number): WallRect[] => {
+    const mid = wx + ww / 2;
+    const left  = mid - d / 2 - wx;
+    const right = wx + ww - (mid + d / 2);
+    return [
+      { x: wx,              y: wy, w: left,  h: t },
+      { x: mid + d / 2,     y: wy, w: right, h: t },
+    ];
+  };
+
+  // Split a vertical wall around a centered door gap
+  const splitV = (wx: number, wy: number, wh: number): WallRect[] => {
+    const mid = wy + wh / 2;
+    const topH    = mid - d / 2 - wy;
+    const bottomH = wy + wh - (mid + d / 2);
+    return [
+      { x: wx, y: wy,          w: t, h: topH    },
+      { x: wx, y: mid + d / 2, w: t, h: bottomH },
+    ];
+  };
+
+  if (doorSide === "bottom") {
+    walls.push(top(), left(), right(), ...splitH(bx, by + bh - t, bw));
+  } else if (doorSide === "top") {
+    walls.push(...splitH(bx, by, bw), left(), right(), bottom());
+  } else if (doorSide === "left") {
+    walls.push(top(), ...splitV(bx, by, bh), right(), bottom());
+  } else {
+    walls.push(top(), left(), ...splitV(bx + bw - t, by, bh), bottom());
+  }
+  return walls;
+}
+
+/** AABB overlap test */
+function overlaps(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number
+): boolean {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
 export class ParisScene extends Phaser.Scene {
   private onZoneClicked!: (event: ZoneClickedEvent) => void;
   private player!: Phaser.GameObjects.Graphics;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: { up: Phaser.Input.Keyboard.Key; down: Phaser.Input.Keyboard.Key; left: Phaser.Input.Keyboard.Key; right: Phaser.Input.Keyboard.Key };
+  private walls: WallRect[] = [];
 
   constructor() {
     super({ key: "ParisScene" });
@@ -213,6 +288,10 @@ export class ParisScene extends Phaser.Scene {
 
   init(data: { onZoneClicked: (e: ZoneClickedEvent) => void }) {
     this.onZoneClicked = data.onZoneClicked;
+  }
+
+  getPlayerPosition(): { x: number; y: number } {
+    return { x: this.player?.x ?? MAP_WIDTH / 2, y: this.player?.y ?? MAP_HEIGHT / 2 };
   }
 
   create() {
@@ -284,29 +363,52 @@ export class ParisScene extends Phaser.Scene {
     this.createDecorativeZones();
   }
 
+  private drawWalls(wallRects: WallRect[]) {
+    const g = this.add.graphics();
+    g.fillStyle(0x1a1208, 1);
+    for (const w of wallRects) {
+      g.fillRect(w.x, w.y, w.w, w.h);
+    }
+    // Door indicator: a lighter strip in the gap on the bottom wall
+    // (visual only — the gap in the wall rects IS the door)
+    g.fillStyle(0x5a4a28, 0.6);
+    // We can't easily know which side the door is here, so just a subtle floor mark
+    // is handled by the absence of wall fill in that gap.
+  }
+
   private createDecorativeZones() {
     const decorGraphics = this.add.graphics();
-    decorGraphics.lineStyle(2, 0x3a3020, 0.8);
     
-    // Helper to draw a "House"
+    // Helper to draw a "House" with walls
     const drawHouse = (col: number, row: number, colSpan = 1, rowSpan = 1, label = "House") => {
       const x = col * CELL_W + 60;
       const y = row * CELL_H + 60;
       const w = CELL_W * colSpan - 120;
       const h = CELL_H * rowSpan - 120;
       
-      decorGraphics.fillStyle(0x3a2a1a, 0.4);
+      // Fill
+      decorGraphics.fillStyle(0x3a2a1a, 1);
       decorGraphics.fillRect(x, y, w, h);
-      decorGraphics.strokeRect(x, y, w, h);
-      
-      this.add.text(x + w/2, y + h/2, label, {
+
+      // Register and draw walls
+      const houseWalls = buildWalls(x, y, w, h, "bottom");
+      this.walls.push(...houseWalls);
+      this.drawWalls(houseWalls);
+
+      // Door highlight (warm strip at the gap)
+      const doorG = this.add.graphics();
+      doorG.fillStyle(0x6a5028, 1);
+      const mid = x + w / 2;
+      doorG.fillRect(mid - DOOR_WIDTH / 2, y + h - WALL_THICKNESS, DOOR_WIDTH, WALL_THICKNESS);
+
+      this.add.text(x + w / 2, y + h / 2, label, {
         fontSize: "14px",
         color: "#6a5a30",
         fontFamily: "Georgia, serif"
       }).setOrigin(0.5);
     };
 
-    // Helper to draw a "Park"
+    // Helper to draw a "Park" — no walls, fully walkable
     const drawPark = (col: number, row: number, colSpan = 1, rowSpan = 1) => {
       const x = col * CELL_W + 40;
       const y = row * CELL_H + 40;
@@ -318,7 +420,7 @@ export class ParisScene extends Phaser.Scene {
       decorGraphics.lineStyle(1, 0x2a4a2a, 0.5);
       decorGraphics.strokeRect(x, y, w, h);
       
-      this.add.text(x + w/2, y + h/2, "Park (walkable)", {
+      this.add.text(x + w / 2, y + h / 2, "Park (walkable)", {
         fontSize: "16px",
         color: "#4a6a4a",
         fontFamily: "Georgia, serif"
@@ -359,17 +461,38 @@ export class ParisScene extends Phaser.Scene {
       vx = (vx / len) * PLAYER_SPEED;
       vy = (vy / len) * PLAYER_SPEED;
       const dt = delta / 1000;
-      let nx = this.player.x + vx * dt;
-      let ny = this.player.y + vy * dt;
       const hw = PLAYER_WIDTH / 2;
       const hh = PLAYER_HEIGHT / 2;
-      nx = Phaser.Math.Clamp(nx, hw, MAP_WIDTH - hw);
-      ny = Phaser.Math.Clamp(ny, hh, MAP_HEIGHT - hh);
+
+      // Try X axis first
+      let nx = Phaser.Math.Clamp(this.player.x + vx * dt, hw, MAP_WIDTH - hw);
+      let ny = this.player.y;
+      if (this.collidesWithWall(nx, ny, hw, hh)) nx = this.player.x;
+
+      // Then Y axis
+      ny = Phaser.Math.Clamp(this.player.y + vy * dt, hh, MAP_HEIGHT - hh);
+      if (this.collidesWithWall(nx, ny, hw, hh)) ny = this.player.y;
+
       this.player.setPosition(nx, ny);
     }
   }
 
+  private collidesWithWall(px: number, py: number, hw: number, hh: number): boolean {
+    const pl = px - hw, pt = py - hh, pw = hw * 2, ph = hh * 2;
+    for (const w of this.walls) {
+      if (overlaps(pl, pt, pw, ph, w.x, w.y, w.w, w.h)) return true;
+    }
+    return false;
+  }
+
   private createZone(zone: Zone) {
+    // Register walls for this building (skip person NPCs — they're open sprites)
+    if (zone.category !== "person") {
+      const zoneWalls = buildWalls(zone.x, zone.y, zone.width, zone.height, "bottom");
+      this.walls.push(...zoneWalls);
+      this.drawWalls(zoneWalls);
+    }
+
     const container = this.add.container(zone.x, zone.y);
 
     const bg = this.add
@@ -402,6 +525,24 @@ export class ParisScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     container.add([bg, icon, label, npcLabel]);
+
+    // Door — drawn on top of the building fill, inside the container (local coords)
+    if (zone.category !== "person") {
+      const doorG = this.add.graphics();
+      const doorX = zone.width / 2 - DOOR_WIDTH / 2;
+      const doorY = zone.height - WALL_THICKNESS;
+      // Amber door fill
+      doorG.fillStyle(0xc8860a, 1);
+      doorG.fillRect(doorX, doorY, DOOR_WIDTH, WALL_THICKNESS);
+      // Dark door frame lines
+      doorG.lineStyle(2, 0x1a1208, 1);
+      doorG.strokeRect(doorX, doorY, DOOR_WIDTH, WALL_THICKNESS);
+      // Door label
+      const doorLabel = this.add
+        .text(zone.width / 2, doorY + WALL_THICKNESS / 2, "🚪", { fontSize: "14px" })
+        .setOrigin(0.5);
+      container.add([doorG, doorLabel]);
+    }
 
     // Hit area
     const hitArea = this.add
