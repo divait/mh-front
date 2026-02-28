@@ -15,16 +15,22 @@ interface DialoguePanelProps {
 }
 
 const NPC_PORTRAITS: Record<string, string> = {
-  baker: "🍞",
+  baker: "🥖",
   guard: "⚔️",
   tavern_keeper: "🍷",
+  cabaret_dancer: "💃",
+  inspector: "🔍",
+  artist: "🎨",
 };
 
-// Keywords that suggest a clue was discovered
+// Keywords that suggest a clue was discovered (Belle Époque)
 const CLUE_TRIGGERS: Record<string, string[]> = {
-  baker: ["miche", "pain", "courrier", "matin", "caché", "livraison"],
-  guard: ["saisir", "ordre", "pamphlet", "courrier", "fuir", "disparu"],
-  tavern_keeper: ["itinéraire", "Renard", "vendu", "regrette", "sou", "liste"],
+  baker: ["esquisse", "miche", "pain", "caché", "livraison", "louvre"],
+  guard: ["saisir", "ordre", "pamphlet", "disparu", "préfecture", "accès"],
+  tavern_keeper: ["itinéraire", "Renard", "vendu", "regrette", "horaire", "nuit"],
+  cabaret_dancer: ["coulisses", "entré", "passage", "secret", "porte", "moulin"],
+  inspector: ["accès", "suspect", "identité", "dossier", "sûreté", "preuves"],
+  artist: ["motif", "ami", "raison", "montmartre", "besoin", "argent"],
 };
 
 export function DialoguePanel({
@@ -76,14 +82,14 @@ export function DialoguePanel({
       const replyLower = reply.toLowerCase();
       for (const trigger of triggers) {
         if (replyLower.includes(trigger)) {
-          onClueDiscovered(`[${npcName}] "${trigger}" mentionné`);
+          onClueDiscovered(`[${npcName}] "${trigger}" mentioned`);
           break;
         }
       }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "npc", content: "*(Le personnage ne répond pas...)*" },
+        { role: "npc", content: "*(The character does not respond...)*" },
       ]);
     } finally {
       setLoading(false);
@@ -99,7 +105,7 @@ export function DialoguePanel({
           <div>
             <div style={styles.npcName}>{npcName}</div>
             <div style={styles.modelBadge}>
-              {modelVariant === "finetuned" ? "🧠 Modèle affiné" : "💬 Prompt engineering"}
+              {modelVariant === "finetuned" ? "🧠 Fine-tuned Model" : "💬 Prompt Engineering"}
             </div>
           </div>
           <button style={styles.closeBtn} onClick={onClose}>
@@ -111,7 +117,7 @@ export function DialoguePanel({
         <div style={styles.messages}>
           {messages.length === 0 && (
             <p style={styles.hint}>
-              Posez votre première question au témoin...
+              Ask your first question to the witness...
             </p>
           )}
           {messages.map((msg, i) => (
@@ -123,7 +129,7 @@ export function DialoguePanel({
               }}
             >
               {msg.role === "player" ? (
-                <span style={styles.playerLabel}>Vous:</span>
+                <span style={styles.playerLabel}>You:</span>
               ) : (
                 <span style={styles.npcLabel}>{npcName}:</span>
               )}
@@ -147,12 +153,12 @@ export function DialoguePanel({
             style={styles.input}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Posez votre question en français ou en anglais..."
+            placeholder="Ask your question..."
             disabled={loading}
             autoFocus
           />
           <button style={styles.sendBtn} type="submit" disabled={loading || !input.trim()}>
-            Envoyer
+            Send
           </button>
         </form>
       </div>

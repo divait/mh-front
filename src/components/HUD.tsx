@@ -9,9 +9,9 @@ export function HUD({ clues, modelVariant, onToggleModel }: HUDProps) {
     <div style={styles.hud}>
       {/* Clue journal */}
       <div style={styles.journal}>
-        <div style={styles.journalTitle}>📜 Journal d'Enquête</div>
+        <div style={styles.journalTitle}>📜 Investigation Journal</div>
         {clues.length === 0 ? (
-          <div style={styles.noClues}>Aucun indice pour l'instant...</div>
+          <div style={styles.noClues}>No clues found yet...</div>
         ) : (
           <ul style={styles.clueList}>
             {clues.map((clue, i) => (
@@ -26,9 +26,9 @@ export function HUD({ clues, modelVariant, onToggleModel }: HUDProps) {
       {/* Model toggle — for the W&B demo comparison */}
       <button style={styles.modelToggle} onClick={onToggleModel}>
         {modelVariant === "prompt_engineered" ? (
-          <>💬 Prompt Engineering<br /><span style={styles.toggleHint}>Basculer → Modèle affiné</span></>
+          <>💬 Prompt Engineering<br /><span style={styles.toggleHint}>Switch → Fine-tuned Model</span></>
         ) : (
-          <>🧠 Modèle affiné<br /><span style={styles.toggleHint}>Basculer → Prompt Eng.</span></>
+          <>🧠 Fine-tuned Model<br /><span style={styles.toggleHint}>Switch → Prompt Eng.</span></>
         )}
       </button>
     </div>
