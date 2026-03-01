@@ -32,6 +32,48 @@ const DANCER_FRAMES: string[] = [
   new URL("../assets/dancer/idle/frame_003.png", import.meta.url).href,
 ];
 
+const INSPECTOR_FRAMES: string[] = [
+  new URL("../assets/inspector/idle/south/frame_000.png", import.meta.url).href,
+  new URL("../assets/inspector/idle/south/frame_001.png", import.meta.url).href,
+  new URL("../assets/inspector/idle/south/frame_002.png", import.meta.url).href,
+  new URL("../assets/inspector/idle/south/frame_003.png", import.meta.url).href,
+];
+
+const ARTIST_FRAMES: string[] = [
+  new URL("../assets/artist/idle/frame_000.png", import.meta.url).href,
+  new URL("../assets/artist/idle/frame_001.png", import.meta.url).href,
+  new URL("../assets/artist/idle/frame_002.png", import.meta.url).href,
+  new URL("../assets/artist/idle/frame_003.png", import.meta.url).href,
+];
+
+const MAIN_IDLE_FRAMES: string[] = [
+  new URL("../assets/main/idle/frame_000.png", import.meta.url).href,
+];
+const MAIN_WALK_FRAMES: string[] = [
+  new URL("../assets/main/walk/frame_000.png", import.meta.url).href,
+  new URL("../assets/main/walk/frame_001.png", import.meta.url).href,
+  new URL("../assets/main/walk/frame_002.png", import.meta.url).href,
+  new URL("../assets/main/walk/frame_003.png", import.meta.url).href,
+  new URL("../assets/main/walk/frame_004.png", import.meta.url).href,
+  new URL("../assets/main/walk/frame_005.png", import.meta.url).href,
+];
+const MAIN_WALK_UP_FRAMES: string[] = [
+  new URL("../assets/main/walk-up/frame_000.png", import.meta.url).href,
+  new URL("../assets/main/walk-up/frame_001.png", import.meta.url).href,
+  new URL("../assets/main/walk-up/frame_002.png", import.meta.url).href,
+  new URL("../assets/main/walk-up/frame_003.png", import.meta.url).href,
+  new URL("../assets/main/walk-up/frame_004.png", import.meta.url).href,
+  new URL("../assets/main/walk-up/frame_005.png", import.meta.url).href,
+];
+const MAIN_WALK_DOWN_FRAMES: string[] = [
+  new URL("../assets/main/walk-down/frame_000.png", import.meta.url).href,
+  new URL("../assets/main/walk-down/frame_001.png", import.meta.url).href,
+  new URL("../assets/main/walk-down/frame_002.png", import.meta.url).href,
+  new URL("../assets/main/walk-down/frame_003.png", import.meta.url).href,
+  new URL("../assets/main/walk-down/frame_004.png", import.meta.url).href,
+  new URL("../assets/main/walk-down/frame_005.png", import.meta.url).href,
+];
+
 export type ZoneId =
   | "baker"
   | "guard"
@@ -71,10 +113,9 @@ interface Zone {
 const MAP_WIDTH = 3200;
 const MAP_HEIGHT = 2400;
 const PLAYER_SPEED = 250; // Increased for larger map
-const PLAYER_WIDTH = 24;
-const PLAYER_HEIGHT = 32;
-const PLAYER_COLOR = 0xe8d5a3;
-
+// Sprite is 48×48 px at 1.6× scale = 76.8 px — use half that as the boundary margin
+const PLAYER_WIDTH = 76;
+const PLAYER_HEIGHT = 76;
 // Grid constants for the layout
 const GRID_COLS = 5;
 const GRID_ROWS = 4;
@@ -327,7 +368,7 @@ interface PendingInteraction {
 
 export class ParisScene extends Phaser.Scene {
   private onZoneClicked!: (event: ZoneClickedEvent) => void;
-  private player!: Phaser.GameObjects.Graphics;
+  private player!: Phaser.GameObjects.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: {
     up: Phaser.Input.Keyboard.Key;
@@ -398,6 +439,24 @@ export class ParisScene extends Phaser.Scene {
     });
     DANCER_FRAMES.forEach((url, i) => {
       this.load.image(`dancer_idle_${i}`, url);
+    });
+    INSPECTOR_FRAMES.forEach((url, i) => {
+      this.load.image(`inspector_idle_${i}`, url);
+    });
+    ARTIST_FRAMES.forEach((url, i) => {
+      this.load.image(`artist_idle_${i}`, url);
+    });
+    MAIN_IDLE_FRAMES.forEach((url, i) => {
+      this.load.image(`main_idle_${i}`, url);
+    });
+    MAIN_WALK_FRAMES.forEach((url, i) => {
+      this.load.image(`main_walk_${i}`, url);
+    });
+    MAIN_WALK_UP_FRAMES.forEach((url, i) => {
+      this.load.image(`main_walk_up_${i}`, url);
+    });
+    MAIN_WALK_DOWN_FRAMES.forEach((url, i) => {
+      this.load.image(`main_walk_down_${i}`, url);
     });
   }
 
@@ -482,6 +541,46 @@ export class ParisScene extends Phaser.Scene {
       frameRate: 6,
       repeat: -1,
     });
+    this.anims.create({
+      key: "inspector_idle",
+      frames: INSPECTOR_FRAMES.map((_, i) => ({ key: `inspector_idle_${i}` })),
+      frameRate: 6,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: "artist_idle",
+      frames: ARTIST_FRAMES.map((_, i) => ({ key: `artist_idle_${i}` })),
+      frameRate: 6,
+      repeat: -1,
+    });
+
+    // Player animations
+    this.anims.create({
+      key: "main_idle",
+      frames: MAIN_IDLE_FRAMES.map((_, i) => ({ key: `main_idle_${i}` })),
+      frameRate: 4,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: "main_walk",
+      frames: MAIN_WALK_FRAMES.map((_, i) => ({ key: `main_walk_${i}` })),
+      frameRate: 10,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: "main_walk_up",
+      frames: MAIN_WALK_UP_FRAMES.map((_, i) => ({ key: `main_walk_up_${i}` })),
+      frameRate: 10,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: "main_walk_down",
+      frames: MAIN_WALK_DOWN_FRAMES.map((_, i) => ({
+        key: `main_walk_down_${i}`,
+      })),
+      frameRate: 10,
+      repeat: -1,
+    });
 
     // Build interactive zones
     ZONES.forEach((zone) => this.createZone(zone));
@@ -490,29 +589,13 @@ export class ParisScene extends Phaser.Scene {
     this.createDecorativeZones();
 
     // Player — created last so it renders on top of all buildings and walls
-    this.player = this.add.graphics();
-    this.player.fillStyle(PLAYER_COLOR, 1);
-    this.player.fillRect(
-      -PLAYER_WIDTH / 2,
-      -PLAYER_HEIGHT / 2,
-      PLAYER_WIDTH,
-      PLAYER_HEIGHT,
-    );
-    // Outline so the player stands out against any background
-    this.player.lineStyle(2, 0x1a1208, 1);
-    this.player.strokeRect(
-      -PLAYER_WIDTH / 2,
-      -PLAYER_HEIGHT / 2,
-      PLAYER_WIDTH,
-      PLAYER_HEIGHT,
-    );
-    // Spawn next to the inspector (Préfecture, row 3 col 0, spans 2.5 cells)
-    // Inspector zone: x=60, y=CELL_H*3+60, width=CELL_W*2.5-120
-    // Stand just outside the bottom door, centered on the building
     const inspectorZone = ZONES.find((z) => z.id === "inspector")!;
-    const spawnX = inspectorZone.x + inspectorZone.width / 2;
-    const spawnY = inspectorZone.y + inspectorZone.height + DOOR_WIDTH;
-    this.player.setPosition(spawnX, spawnY);
+    const spawnX = inspectorZone.x + inspectorZone.width / 2 + 40;
+    const spawnY = inspectorZone.y + inspectorZone.height / 2 - 10;
+    this.player = this.add.sprite(spawnX, spawnY, "main_idle_0");
+    this.player.setScale(1.6);
+    this.player.setDepth(10);
+    this.player.play("main_idle");
     this.children.bringToTop(this.player);
 
     // Camera follow player
@@ -654,6 +737,15 @@ export class ParisScene extends Phaser.Scene {
           MAP_HEIGHT - hh,
         );
         this.player.setPosition(nx, ny);
+
+        // Animate auto-walk
+        if (Math.abs(dy) > Math.abs(dx)) {
+          this.player.play(dy < 0 ? "main_walk_up" : "main_walk_down", true);
+          this.player.setFlipX(false);
+        } else {
+          this.player.play("main_walk", true);
+          this.player.setFlipX(dx < 0);
+        }
       }
 
       // Any manual key press cancels auto-walk
@@ -698,6 +790,21 @@ export class ParisScene extends Phaser.Scene {
       if (this.collidesWithWall(nx, ny, hw, hh)) ny = this.player.y;
 
       this.player.setPosition(nx, ny);
+
+      // Pick animation — vertical takes priority over horizontal
+      if (vy < 0) {
+        this.player.play("main_walk_up", true);
+        this.player.setFlipX(false);
+      } else if (vy > 0) {
+        this.player.play("main_walk_down", true);
+        this.player.setFlipX(false);
+      } else {
+        // Horizontal: walk right is the source, flip for left
+        this.player.play("main_walk", true);
+        this.player.setFlipX(vx < 0);
+      }
+    } else {
+      this.player.play("main_idle", true);
     }
   }
 
@@ -858,6 +965,16 @@ export class ParisScene extends Phaser.Scene {
       sprite.setScale(1.6);
       sprite.play("dancer_idle");
       npcVisual = sprite;
+    } else if (zone.id === "inspector") {
+      const sprite = this.add.sprite(npcCX, npcCY, "inspector_idle_0");
+      sprite.setScale(1.6);
+      sprite.play("inspector_idle");
+      npcVisual = sprite;
+    } else if (zone.id === "artist") {
+      const sprite = this.add.sprite(npcCX, npcCY, "artist_idle_0");
+      sprite.setScale(1.6);
+      sprite.play("artist_idle");
+      npcVisual = sprite;
     } else {
       const g = this.add.graphics();
       g.fillStyle(zone.category === "person" ? 0x888888 : zone.borderColor, 1);
@@ -882,21 +999,18 @@ export class ParisScene extends Phaser.Scene {
       zone.id === "baker" ||
       zone.id === "tavern_keeper" ||
       zone.id === "guard" ||
-      zone.id === "cabaret_dancer";
+      zone.id === "cabaret_dancer" ||
+      zone.id === "inspector" ||
+      zone.id === "artist";
 
     // NPC name below sprite
     const npcName = this.add
-      .text(
-        npcCX,
-        npcCY + (isSprite ? 40 : NPC_H / 2 + 14),
-        zone.npcName,
-        {
-          fontSize: "11px",
-          color: zone.category === "person" ? "#aaaaaa" : "#d4af37",
-          fontFamily: "Georgia, serif",
-          fontStyle: "italic",
-        },
-      )
+      .text(npcCX, npcCY + (isSprite ? 40 : NPC_H / 2 + 14), zone.npcName, {
+        fontSize: "11px",
+        color: zone.category === "person" ? "#aaaaaa" : "#d4af37",
+        fontFamily: "Georgia, serif",
+        fontStyle: "italic",
+      })
       .setOrigin(0.5, 0);
 
     // Invisible hit zone over the NPC sprite (slightly larger for easier clicking)
