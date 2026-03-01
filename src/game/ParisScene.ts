@@ -588,9 +588,9 @@ export class ParisScene extends Phaser.Scene {
     // Build decorative "House" and "Park" zones based on reference grid
     this.createDecorativeZones();
 
-    // Player — created last so it renders on top of all buildings and walls
+    // Player — spawn in the street just below the Préfecture, clear of all walls/NPCs
     const inspectorZone = ZONES.find((z) => z.id === "inspector")!;
-    const spawnX = inspectorZone.x + inspectorZone.width / 2 + 40;
+    const spawnX = inspectorZone.x + inspectorZone.width / 2 + 50;
     const spawnY = inspectorZone.y + inspectorZone.height / 2 - 10;
     this.player = this.add.sprite(spawnX, spawnY, "main_idle_0");
     this.player.setScale(1.6);
@@ -889,6 +889,21 @@ export class ParisScene extends Phaser.Scene {
       this.walls.push(...zoneWalls);
       this.drawWalls(zoneWalls);
     }
+
+    // Solid collision box around the NPC sprite so the player cannot walk through them
+    const npcWorldCX = zone.x + zone.width / 2;
+    const npcWorldCY =
+      zone.category === "person"
+        ? zone.y + zone.height / 2
+        : zone.y + zone.height / 2 - 10;
+    const npcBlockW = 0;
+    const npcBlockH = 30;
+    this.walls.push({
+      x: npcWorldCX - npcBlockW / 2,
+      y: npcWorldCY - npcBlockH / 2,
+      w: npcBlockW,
+      h: npcBlockH,
+    });
 
     const container = this.add.container(zone.x, zone.y);
 
