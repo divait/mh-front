@@ -11,7 +11,7 @@ interface DialoguePanelProps {
   npcId: string;
   npcName: string;
   sessionId: string;
-  modelVariant: "prompt_engineered" | "finetuned";
+
   onClose: () => void;
   onClueDiscovered: (npcId: string, npcName: string, summary: string) => void;
   isInspector?: boolean;
@@ -34,7 +34,7 @@ export function DialoguePanel({
   npcId,
   npcName,
   sessionId,
-  modelVariant,
+
   onClose,
   onClueDiscovered,
   isInspector = false,
@@ -77,7 +77,7 @@ export function DialoguePanel({
           session_id: sessionId,
           npc_id: npcId,
           player_message: text,
-          model_variant: modelVariant,
+          model_variant: "prompt_engineered",
         }),
       });
 
@@ -159,7 +159,7 @@ export function DialoguePanel({
             session_id: sessionId,
             npc_id: npcId,
             player_message: `The player is making a formal accusation: ${fullArgument}. React in character as the inspector — if the argument is compelling and evidence is solid, say you will make the arrest. If it is weak or wrong, dismiss it coldly.`,
-            model_variant: modelVariant,
+            model_variant: "prompt_engineered",
           }),
         }),
         fetch("/quest/solve", {
@@ -214,9 +214,7 @@ export function DialoguePanel({
           <span style={styles.portrait}>{NPC_PORTRAITS[npcId] ?? "👤"}</span>
           <div>
             <div style={styles.npcName}>{npcName}</div>
-            <div style={styles.modelBadge}>
-              {modelVariant === "finetuned" ? "🧠 Fine-tuned Model" : "💬 Prompt Engineering"}
-            </div>
+
           </div>
           {isInspector && (
             <div style={styles.attemptsBadge}>

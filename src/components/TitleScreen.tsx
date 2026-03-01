@@ -1,9 +1,11 @@
 interface TitleScreenProps {
   isLoading: boolean;
   onStart: () => void;
+  modelVariant: "prompt_engineered" | "finetuned";
+  onToggleModel: () => void;
 }
 
-export function TitleScreen({ isLoading, onStart }: TitleScreenProps) {
+export function TitleScreen({ isLoading, onStart, modelVariant, onToggleModel }: TitleScreenProps) {
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
@@ -25,6 +27,24 @@ export function TitleScreen({ isLoading, onStart }: TitleScreenProps) {
           <br />
           before time runs out.
         </p>
+
+        {/* Model Toggle button */}
+        <button
+          style={{
+            ...styles.toggleBtn,
+            opacity: isLoading ? 0.6 : 1,
+            cursor: isLoading ? "not-allowed" : "pointer",
+          }}
+          onClick={onToggleModel}
+          disabled={isLoading}
+        >
+          {modelVariant === "finetuned"
+            ? "🧠 Fine-tuned Quest Generation"
+            : "💬 Prompt-Engineered Quest Generation"}
+          <div style={styles.toggleHint}>
+            (Click to switch)
+          </div>
+        </button>
 
         {/* Start button */}
         <button
@@ -154,5 +174,24 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "Georgia, serif",
     fontStyle: "italic",
     letterSpacing: 0.5,
+  },
+  toggleBtn: {
+    background: "rgba(30, 24, 16, 0.8)",
+    border: "1px solid #a89060",
+    borderRadius: 8,
+    color: "#e8dfc0",
+    fontFamily: "Georgia, serif",
+    fontSize: 14,
+    padding: "8px 16px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+    transition: "background 0.2s, border-color 0.2s",
+  },
+  toggleHint: {
+    fontSize: 10,
+    color: "#888",
+    fontStyle: "italic",
   },
 };

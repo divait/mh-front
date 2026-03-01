@@ -60,6 +60,14 @@ export default function App() {
   const [modelVariant, setModelVariant] = useState<
     "prompt_engineered" | "finetuned"
   >("prompt_engineered");
+  const modelVariantRef = useRef<{ variant: "prompt_engineered" | "finetuned" }>({ variant: "prompt_engineered" });
+
+  const [showDevQuest, setShowDevQuest] = useState(false);
+  const [devQuestData, setDevQuestData] = useState<any>(null);
+
+  useEffect(() => {
+    modelVariantRef.current.variant = modelVariant;
+  }, [modelVariant]);
 
   // ── Game state ───────────────────────────────────────────────────────────────
   const [gamePhase, setGamePhase] = useState<GamePhase>("playing");
@@ -178,10 +186,11 @@ export default function App() {
     setAppState("loading_quest");
     appStateRef.current = "loading_quest";
     try {
+      const gmModel = modelVariantRef.current.variant === "finetuned" ? "finetuned" : "mistral-medium-latest";
       const res = await fetch("/quest/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: SESSION_ID, model: "quest_0" }),
+        body: JSON.stringify({ session_id: SESSION_ID, model: gmModel }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -343,6 +352,8 @@ export default function App() {
         <TitleScreen
           isLoading={appState === "loading_quest"}
           onStart={handleStart}
+          modelVariant={modelVariant}
+          onToggleModel={() => setModelVariant((v) => v === "prompt_engineered" ? "finetuned" : "prompt_engineered")}
         />
       )}
 
@@ -377,15 +388,99 @@ export default function App() {
         </button>
       )}
 
+      {/* Bottom-left Dev Tools Quest Reveal Button */}
+      {isGameActive && (
+        <button
+          style={{
+            position: "fixed",
+            bottom: 16,
+            left: 16,
+            zIndex: 60,
+            background: "rgba(26,18,8,0.92)",
+            border: "1px dashed #888",
+            borderRadius: 8,
+            color: "#888",
+            cursor: "pointer",
+            fontSize: 12,
+            fontFamily: "monospace",
+            padding: "8px 12px",
+          }}
+          onClick={async () => {
+             if (!showDevQuest) {
+                try {
+                  const r = await fetch(`/quest/session/${SESSION_ID}`);
+                  if (r.ok) setDevQuestData(await r.json());
+                } catch { /* ignore */ }
+             }
+             setShowDevQuest(!showDevQuest);
+          }}
+        >
+          ⚙️ Debug: {showDevQuest ? "Hide" : "Show"} Quest Truth
+        </button>
+      )}
+
+      {/* Dev Tools Quest Display Panel */}
+      {isGameActive && showDevQuest && devQuestData && (
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+          position: "fixed",
+          bottom: 60,
+          left: 16,
+          zIndex: 60,
+          background: "rgba(10,10,10,0.95)",
+          border: "1px solid #d4af37",
+          borderRadius: 8,
+          padding: 16,
+          width: 400,
+          maxHeight: "60vh",
+          overflowY: "auto",
+          color: "#e8dfc0",
+          fontFamily: "Georgia, serif",
+          fontSize: 13,
+          boxShadow: "0 0 20px rgba(0,0,0,0.8)",
+        }}>
+          <h3 style={{ margin: "0 0 10px 0", color: "#d4af37", fontSize: 16 }}>Actual Game Master Output</h3>
+          <p><strong>Title:</strong> {devQuestData.title}</p>
+          <p><strong>Description:</strong> {devQuestData.description}</p>
+          <div style={{ margin: "10px 0", padding: "10px", background: "rgba(255,255,255,0.05)", borderRadius: 4 }}>
+            <strong>The True Solution:</strong>
+            <ul style={{ margin: "4px 0 0 0", paddingLeft: 20 }}>
+              <li><strong>Who:</strong> {devQuestData.solution?.suspect ?? "Missing"}</li>
+              <li><strong>Why:</strong> {devQuestData.solution?.motive ?? "Missing"}</li>
+              <li><strong>How:</strong> {devQuestData.solution?.method ?? "Missing"}</li>
+            </ul>
+          </div>
+          <strong>Red Herrings generated:</strong>
+          <ul style={{ marginTop: 4, paddingLeft: 20 }}>
+            {devQuestData.red_herrings?.map((rh: string, i: number) => <li key={i}>{rh}</li>)}
+          </ul>
+          
+          <div style={{ marginTop: 10, borderTop: "1px dashed rgba(212, 175, 55, 0.3)", paddingTop: 10 }}>
+            <strong>Generated Clues (The Chain):</strong>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+              {devQuestData.clues?.map((c: any, i: number) => (
+                <div key={i} style={{ background: "rgba(0,0,0,0.4)", padding: 8, borderRadius: 4, borderLeft: "2px solid #a89060" }}>
+                  <div style={{ color: "#d4af37", fontWeight: "bold", marginBottom: 4 }}>
+                    {c.sequence}. {c.npc_id} {c.leads_to ? `→ points to ${c.leads_to}` : " (Final File)"}
+                  </div>
+                  <div style={{ fontSize: 11, marginBottom: 2 }}>
+                    <span style={{ color: "#888" }}>Secret:</span> {c.secret}
+                  </div>
+                  <div style={{ fontSize: 11, fontStyle: "italic", color: "#c8bfa0" }}>
+                    <span style={{ color: "#888", fontStyle: "normal" }}>Hint:</span> "{c.hint}"
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {isGameActive && (
         <HUD
           clues={clues}
-          modelVariant={modelVariant}
-          onToggleModel={() =>
-            setModelVariant((v) =>
-              v === "prompt_engineered" ? "finetuned" : "prompt_engineered",
-            )
-          }
           currentDay={currentDay}
           totalDays={totalDays}
           dayProgress={dayProgress}
@@ -400,7 +495,6 @@ export default function App() {
           npcId={activeNPC.id}
           npcName={activeNPC.name}
           sessionId={SESSION_ID}
-          modelVariant={modelVariant}
           onClose={() => {
             setActiveNPC(null);
             setSceneMovement(true);

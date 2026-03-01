@@ -3,8 +3,6 @@ import type { NpcClues } from "../App";
 
 interface HUDProps {
   clues: Record<string, NpcClues>;
-  modelVariant: "prompt_engineered" | "finetuned";
-  onToggleModel: () => void;
   currentDay: number;
   totalDays: number;
   dayProgress: number;
@@ -15,8 +13,6 @@ interface HUDProps {
 
 export function HUD({
   clues,
-  modelVariant,
-  onToggleModel,
   currentDay,
   totalDays,
   dayProgress,
@@ -96,14 +92,6 @@ export function HUD({
         )}
       </div>
 
-      {/* Model toggle — for the W&B demo comparison */}
-      <button style={styles.modelToggle} onClick={onToggleModel}>
-        {modelVariant === "prompt_engineered" ? (
-          <>💬 Prompt Engineering<br /><span style={styles.toggleHint}>Switch → Fine-tuned Model</span></>
-        ) : (
-          <>🧠 Fine-tuned Model<br /><span style={styles.toggleHint}>Switch → Prompt Eng.</span></>
-        )}
-      </button>
     </div>
   );
 }
