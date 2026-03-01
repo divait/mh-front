@@ -46,6 +46,7 @@ export function DialoguePanel({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Accusation panel state
   const [showAccuse, setShowAccuse] = useState(false);
@@ -59,6 +60,25 @@ export function DialoguePanel({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playNpcAudio = (text: string, id: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audioUrl = `/dialogue/tts?text=${encodeURIComponent(text)}&npc_id=${id}`;
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    audio.play().catch(e => console.error("Audio playback failed:", e));
+  };
 
   async function sendMessage(e: FormEvent) {
     e.preventDefault();
@@ -86,6 +106,7 @@ export function DialoguePanel({
       const reply: string = data.response;
 
       setMessages((prev) => [...prev, { role: "npc", content: reply }]);
+      playNpcAudio(reply, npcId);
 
       // Non-blocking: ask Mistral to summarise the whole conversation so far into
       // a crisp investigator's note. The journal entry for this NPC is replaced
@@ -177,10 +198,12 @@ export function DialoguePanel({
       // Show inspector's in-character reaction
       if (dialogueRes.ok) {
         const dialogueData = await dialogueRes.json();
+        const reply = dialogueData.response ?? "*(silence)*";
         setMessages((prev) => [
           ...prev,
-          { role: "npc", content: dialogueData.response ?? "*(silence)*" },
+          { role: "npc", content: reply },
         ]);
+        playNpcAudio(reply, npcId);
       }
 
       if (!solveRes.ok) throw new Error(`Solve HTTP ${solveRes.status}`);

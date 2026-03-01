@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface IntroDialogueProps {
   sessionId: string;
@@ -16,6 +16,7 @@ export function IntroDialogue({ sessionId, onComplete }: IntroDialogueProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [loading, setLoading] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Fetch intro lines from backend
   useEffect(() => {
@@ -57,6 +58,29 @@ export function IntroDialogue({ sessionId, onComplete }: IntroDialogueProps) {
     setDisplayedText("");
     setIsTyping(true);
 
+    // Stop previous audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    // Play new audio
+    const textToSpeak = encodeURIComponent(fullLine);
+    const audioUrl = `/dialogue/tts?text=${textToSpeak}&npc_id=inspector`;
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    
+    audio.onended = () => {
+      if (audioRef.current === audio) {
+        if (currentLineIndex + 1 >= lines.length) {
+          onComplete(questTitle, firstLeadNpc);
+        } else {
+          setCurrentLineIndex((prev) => prev + 1);
+        }
+      }
+    };
+    audio.play().catch((e) => console.error("Audio play failed:", e));
+
     const typeInterval = setInterval(() => {
       charIndex++;
       setDisplayedText(fullLine.slice(0, charIndex));
@@ -66,12 +90,26 @@ export function IntroDialogue({ sessionId, onComplete }: IntroDialogueProps) {
       }
     }, CHAR_DELAY_MS);
 
-    return () => clearInterval(typeInterval);
+    return () => {
+      clearInterval(typeInterval);
+    };
   }, [currentLineIndex, lines, loading]);
 
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => stopAudio(); // cleanup on unmount
+  }, [stopAudio]);
+
   const skipAll = useCallback(() => {
+    stopAudio();
     onComplete(questTitle, firstLeadNpc);
-  }, [questTitle, firstLeadNpc, onComplete]);
+  }, [questTitle, firstLeadNpc, onComplete, stopAudio]);
 
   const advance = useCallback(() => {
     if (isTyping) {
@@ -81,11 +119,12 @@ export function IntroDialogue({ sessionId, onComplete }: IntroDialogueProps) {
       return;
     }
     if (isDone) {
+      stopAudio();
       onComplete(questTitle, firstLeadNpc);
       return;
     }
     setCurrentLineIndex((i) => i + 1);
-  }, [isTyping, isDone, lines, currentLineIndex, questTitle, firstLeadNpc, onComplete]);
+  }, [isTyping, isDone, lines, currentLineIndex, questTitle, firstLeadNpc, onComplete, stopAudio]);
 
   // Keyboard: Space or Enter advances
   useEffect(() => {
