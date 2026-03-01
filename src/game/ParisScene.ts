@@ -814,8 +814,14 @@ export class ParisScene extends Phaser.Scene {
       const exteriorDoorG = this.add.graphics();
       const extDoorWidth = 60;
       const extDoorHeight = 10;
-      const extDoorX = hitBox.bx + hitBox.bw / 2 - extDoorWidth / 2;
-      const extDoorY = hitBox.by + hitBox.bh - extDoorHeight / 2;
+      
+      // Calculate door position relative to the zone container
+      // hitBox is global (zone.x, zone.y), so we must subtract zone.x/zone.y to get local coordinates
+      const localBx = hitBox.bx - zone.x;
+      const localBy = hitBox.by - zone.y;
+      
+      const extDoorX = localBx + hitBox.bw / 2 - extDoorWidth / 2;
+      const extDoorY = localBy + hitBox.bh - extDoorHeight / 2;
       
       exteriorDoorG.fillStyle(0x1a1208, 0.7);
       exteriorDoorG.fillRect(extDoorX, extDoorY, extDoorWidth, extDoorHeight);
