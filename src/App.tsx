@@ -5,6 +5,7 @@ import { DialoguePanel } from "./components/DialoguePanel";
 import { HUD } from "./components/HUD";
 import { GameOverScreen } from "./components/GameOverScreen";
 import { IntroDialogue } from "./components/IntroDialogue";
+import { TitleScreen } from "./components/TitleScreen";
 import {
   DAY_DURATION_MS,
   MAX_ARREST_ATTEMPTS,
@@ -17,6 +18,8 @@ import {
   type GamePhase,
   type TimeOfDay,
 } from "./game/gameState";
+
+type AppState = "title" | "loading_quest" | "camera_pan" | "intro" | "playing";
 
 // Stable session ID for this browser tab
 const SESSION_ID = `session_${Math.random().toString(36).slice(2, 10)}`;
@@ -37,8 +40,9 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapGridRef = useRef<HTMLDivElement | null>(null);
 
-  // ── Intro state ──────────────────────────────────────────────────────────────
-  const [showIntro, setShowIntro] = useState(true);
+  // ── App state machine ─────────────────────────────────────────────────────────
+  const [appState, setAppState] = useState<AppState>("title");
+  const appStateRef = useRef<AppState>("title");
 
   // ── NPC / UI state ──────────────────────────────────────────────────────────
   const [activeNPC, setActiveNPC] = useState<ActiveNPC | null>(null);
@@ -73,29 +77,13 @@ export default function App() {
   useEffect(() => { totalDaysRef.current = totalDays; }, [totalDays]);
   useEffect(() => { dayElapsedMsRef.current = dayElapsedMs; }, [dayElapsedMs]);
 
-  // Pause timer whenever a panel is open or intro is showing
-  useEffect(() => {
-    timerPausedRef.current = activeNPC !== null || isMapOpen || showIntro;
-  }, [activeNPC, isMapOpen, showIntro]);
+  // Keep appStateRef in sync
+  useEffect(() => { appStateRef.current = appState; }, [appState]);
 
-  // ── Fetch quest on mount ─────────────────────────────────────────────────────
+  // Pause timer whenever a panel is open or not yet playing
   useEffect(() => {
-    async function fetchQuest() {
-      try {
-        const res = await fetch(`/quest/session/${SESSION_ID}`);
-        if (res.ok) {
-          const data = await res.json();
-          const clueCount: number = data.clues?.length ?? 6;
-          setTotalDays(computeTotalDays(clueCount));
-          totalDaysRef.current = computeTotalDays(clueCount);
-          if (data.title) setQuestTitle(data.title);
-        }
-      } catch {
-        // Silently fall back to defaults (QUEST_0 has 6 clues → 3 days)
-      }
-    }
-    fetchQuest();
-  }, []);
+    timerPausedRef.current = activeNPC !== null || isMapOpen || appState !== "playing";
+  }, [activeNPC, isMapOpen, appState]);
 
   // ── Game timer (1-second tick) ───────────────────────────────────────────────
   useEffect(() => {
@@ -150,10 +138,43 @@ export default function App() {
   const timeOfDayLabel = `${TIME_OF_DAY_ICONS[timeOfDay]} ${timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)}`;
   const dayTimeLeftSec = Math.max(0, Math.ceil((DAY_DURATION_MS - dayElapsedMs) / 1000));
 
+  // ── Start handler (triggered by TitleScreen) ─────────────────────────────────
+  const handleStart = useCallback(async () => {
+    setAppState("loading_quest");
+    appStateRef.current = "loading_quest";
+    try {
+      const res = await fetch("/quest/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: SESSION_ID, model: "quest_0" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const clueCount: number = data.clues?.length ?? 6;
+        const days = computeTotalDays(clueCount);
+        setTotalDays(days);
+        totalDaysRef.current = days;
+        if (data.title) setQuestTitle(data.title);
+      }
+    } catch {
+      // Fall back to defaults (QUEST_0: 6 clues → 3 days)
+    }
+
+    // Quest loaded → start camera pan
+    setAppState("camera_pan");
+    appStateRef.current = "camera_pan";
+    const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+    scene?.panToInspector(() => {
+      setAppState("intro");
+      appStateRef.current = "intro";
+    });
+  }, []);
+
   // ── Intro complete handler ───────────────────────────────────────────────────
   const handleIntroComplete = useCallback((title: string, _firstLead: string) => {
     if (title) setQuestTitle(title);
-    setShowIntro(false);
+    setAppState("playing");
+    appStateRef.current = "playing";
     // Re-enable movement now that the intro is dismissed
     const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
     scene?.setMovementEnabled(true);
@@ -238,10 +259,11 @@ export default function App() {
           game.scene.start("ParisScene", { onZoneClicked: handleZoneClicked });
         },
         postBoot: (game) => {
-          // Disable movement until the intro dialogue is dismissed
+          // Zoom out to show the full city as the title screen backdrop
           setTimeout(() => {
             const scene = game.scene.getScene("ParisScene") as ParisScene | null;
             scene?.setMovementEnabled(false);
+            scene?.zoomOutToCity();
           }, 500);
         },
       },
@@ -253,50 +275,64 @@ export default function App() {
     };
   }, []);
 
+  const isGameActive = appState === "playing" || appState === "intro";
+
   return (
     <>
       <div ref={containerRef} style={{ width: "100vw", height: "100vh" }} />
 
-      {/* Top-left Map Button */}
-      <button
-        style={{
-          position: "fixed",
-          top: 16,
-          left: 16,
-          zIndex: 60,
-          background: "rgba(26,18,8,0.92)",
-          border: "1px solid #d4af37",
-          borderRadius: 8,
-          color: "#d4af37",
-          cursor: "pointer",
-          fontSize: 14,
-          fontFamily: "Georgia, serif",
-          fontWeight: "bold",
-          padding: "10px 16px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
-        }}
-        onClick={() => {
-          const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
-          if (scene) setPlayerPos(scene.getPlayerPosition());
-          setIsMapOpen(true);
-        }}
-      >
-        🗺️ City Map
-      </button>
+      {/* Title screen overlay — shown until quest is loaded and camera pan starts */}
+      {(appState === "title" || appState === "loading_quest") && (
+        <TitleScreen
+          isLoading={appState === "loading_quest"}
+          onStart={handleStart}
+        />
+      )}
 
-      <HUD
-        clues={clues}
-        modelVariant={modelVariant}
-        onToggleModel={() =>
-          setModelVariant((v) => (v === "prompt_engineered" ? "finetuned" : "prompt_engineered"))
-        }
-        currentDay={currentDay}
-        totalDays={totalDays}
-        dayProgress={dayProgress}
-        timeOfDayLabel={timeOfDayLabel}
-        dayTimeLeftSec={dayTimeLeftSec}
-        arrestAttempts={arrestAttempts}
-      />
+      {/* Top-left Map Button — only visible during active gameplay */}
+      {isGameActive && (
+        <button
+          style={{
+            position: "fixed",
+            top: 16,
+            left: 16,
+            zIndex: 60,
+            background: "rgba(26,18,8,0.92)",
+            border: "1px solid #d4af37",
+            borderRadius: 8,
+            color: "#d4af37",
+            cursor: "pointer",
+            fontSize: 14,
+            fontFamily: "Georgia, serif",
+            fontWeight: "bold",
+            padding: "10px 16px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+          }}
+          onClick={() => {
+            const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+            if (scene) setPlayerPos(scene.getPlayerPosition());
+            setIsMapOpen(true);
+          }}
+        >
+          🗺️ City Map
+        </button>
+      )}
+
+      {isGameActive && (
+        <HUD
+          clues={clues}
+          modelVariant={modelVariant}
+          onToggleModel={() =>
+            setModelVariant((v) => (v === "prompt_engineered" ? "finetuned" : "prompt_engineered"))
+          }
+          currentDay={currentDay}
+          totalDays={totalDays}
+          dayProgress={dayProgress}
+          timeOfDayLabel={timeOfDayLabel}
+          dayTimeLeftSec={dayTimeLeftSec}
+          arrestAttempts={arrestAttempts}
+        />
+      )}
 
       {activeNPC && activeNPC.category !== "person" && (
         <DialoguePanel
@@ -478,7 +514,7 @@ export default function App() {
         />
       )}
 
-      {showIntro && gamePhase === "playing" && (
+      {appState === "intro" && gamePhase === "playing" && (
         <IntroDialogue
           sessionId={SESSION_ID}
           onComplete={handleIntroComplete}

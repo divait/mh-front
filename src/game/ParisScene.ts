@@ -110,12 +110,13 @@ interface Zone {
   greeting?: string;
 }
 
-const MAP_WIDTH = 3200;
-const MAP_HEIGHT = 2400;
-const PLAYER_SPEED = 250; // Increased for larger map
-// Sprite is 48×48 px at 1.6× scale = 76.8 px — use half that as the boundary margin
-const PLAYER_WIDTH = 76;
-const PLAYER_HEIGHT = 76;
+const MAP_SCALE = 0.8;
+const MAP_WIDTH = Math.round(3200 * MAP_SCALE);
+const MAP_HEIGHT = Math.round(2400 * MAP_SCALE);
+const PLAYER_SPEED = 250;
+// Sprite is 48×48 px at 1.28× scale = 61.4 px — use half that as the boundary margin
+const PLAYER_WIDTH = Math.round(76 * MAP_SCALE);
+const PLAYER_HEIGHT = Math.round(76 * MAP_SCALE);
 // Grid constants for the layout
 const GRID_COLS = 5;
 const GRID_ROWS = 4;
@@ -276,7 +277,7 @@ const ZONES: Zone[] = [
 
 export { MAP_WIDTH, MAP_HEIGHT };
 
-const TALK_RADIUS = 150; // px — player can open dialogue within this distance of NPC center
+const TALK_RADIUS = Math.round(150 * MAP_SCALE); // px — player can open dialogue within this distance of NPC center
 
 // Axis-aligned rectangle used for wall collision
 interface WallRect {
@@ -286,8 +287,8 @@ interface WallRect {
   h: number;
 }
 
-const WALL_THICKNESS = 16;
-const DOOR_WIDTH = 60;
+const WALL_THICKNESS = Math.round(16 * MAP_SCALE);
+const DOOR_WIDTH = Math.round(60 * MAP_SCALE);
 
 /**
  * Build wall segments for a rectangular building.
@@ -423,6 +424,41 @@ export class ParisScene extends Phaser.Scene {
   setDayLabel(day: number) {
     if (!this.titleText) return;
     this.titleText.setText(`⚜  Paris, 1900  —  Day ${day}  ⚜`);
+  }
+
+  /**
+   * Zoom the camera out so the entire map fills the viewport with no black bars.
+   * Uses the larger of the two scale factors (cover strategy) so the map always
+   * fills the screen edge-to-edge; the camera bounds prevent scrolling past the edges.
+   */
+  zoomOutToCity() {
+    const cam = this.cameras.main;
+    cam.stopFollow();
+    // "Cover" fit: scale up to whichever axis needs more zoom to fill the screen
+    const zoomX = cam.width / MAP_WIDTH;
+    const zoomY = cam.height / MAP_HEIGHT;
+    const zoom = Math.max(zoomX, zoomY);
+    cam.setZoom(zoom);
+    cam.centerOn(MAP_WIDTH / 2, MAP_HEIGHT / 2);
+  }
+
+  /**
+   * Pan and zoom the camera from the city overview to the inspector zone,
+   * then re-attach camera follow to the player and call onComplete.
+   */
+  panToInspector(onComplete: () => void) {
+    const inspectorZone = ZONES.find((z) => z.id === "inspector")!;
+    const targetX = inspectorZone.x + inspectorZone.width / 2;
+    const targetY = inspectorZone.y + inspectorZone.height / 2;
+
+    this.cameras.main.pan(targetX, targetY, 2200, "Sine.easeInOut");
+    // Zoom back to 1:1 pixel ratio — the player sprites are already scaled for this
+    this.cameras.main.zoomTo(1.0, 2200, "Sine.easeInOut", false, (_cam, progress) => {
+      if (progress === 1) {
+        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        onComplete();
+      }
+    });
   }
 
   preload() {
@@ -593,13 +629,14 @@ export class ParisScene extends Phaser.Scene {
     const spawnX = inspectorZone.x + inspectorZone.width / 2 + 50;
     const spawnY = inspectorZone.y + inspectorZone.height / 2 - 10;
     this.player = this.add.sprite(spawnX, spawnY, "main_idle_0");
-    this.player.setScale(1.6);
+    this.player.setScale(1.6 * MAP_SCALE);
     this.player.setDepth(10);
     this.player.play("main_idle");
     this.children.bringToTop(this.player);
 
-    // Camera follow player
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    // Center on player initially; zoomOutToCity() (called from postBoot) will
+    // stop follow and zoom out. panToInspector() re-attaches follow after the pan.
+    this.cameras.main.centerOn(this.player.x, this.player.y);
   }
 
   private drawWalls(wallRects: WallRect[]) {
@@ -962,32 +999,32 @@ export class ParisScene extends Phaser.Scene {
     if (zone.id === "baker") {
       // Pixel-art sprite — scale up 1.5× from 48×48 (renders at 72×72)
       const sprite = this.add.sprite(npcCX, npcCY, "baker_idle_0");
-      sprite.setScale(1.5);
+      sprite.setScale(1.5 * MAP_SCALE);
       sprite.play("baker_idle");
       npcVisual = sprite;
     } else if (zone.id === "tavern_keeper") {
       const sprite = this.add.sprite(npcCX, npcCY, "tavern_keeper_idle_0");
-      sprite.setScale(1.6);
+      sprite.setScale(1.6 * MAP_SCALE);
       sprite.play("tavern_keeper_idle");
       npcVisual = sprite;
     } else if (zone.id === "guard") {
       const sprite = this.add.sprite(npcCX, npcCY, "guard_idle_0");
-      sprite.setScale(1.6);
+      sprite.setScale(1.6 * MAP_SCALE);
       sprite.play("guard_idle");
       npcVisual = sprite;
     } else if (zone.id === "cabaret_dancer") {
       const sprite = this.add.sprite(npcCX, npcCY, "dancer_idle_0");
-      sprite.setScale(1.6);
+      sprite.setScale(1.6 * MAP_SCALE);
       sprite.play("dancer_idle");
       npcVisual = sprite;
     } else if (zone.id === "inspector") {
       const sprite = this.add.sprite(npcCX, npcCY, "inspector_idle_0");
-      sprite.setScale(1.6);
+      sprite.setScale(1.6 * MAP_SCALE);
       sprite.play("inspector_idle");
       npcVisual = sprite;
     } else if (zone.id === "artist") {
       const sprite = this.add.sprite(npcCX, npcCY, "artist_idle_0");
-      sprite.setScale(1.6);
+      sprite.setScale(1.6 * MAP_SCALE);
       sprite.play("artist_idle");
       npcVisual = sprite;
     } else {
