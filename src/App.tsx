@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Phaser from "phaser";
-import { ParisScene, ZoneClickedEvent, MAP_WIDTH, MAP_HEIGHT } from "./game/ParisScene";
+import {
+  ParisScene,
+  MAP_WIDTH,
+  MAP_HEIGHT,
+} from "./game/ParisScene";
+import { ZoneClickedEvent } from "./game/types";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { HUD } from "./components/HUD";
 import { GameOverScreen } from "./components/GameOverScreen";
@@ -48,21 +53,28 @@ export default function App() {
   const [activeNPC, setActiveNPC] = useState<ActiveNPC | null>(null);
   const [personGreeting, setPersonGreeting] = useState<string | null>(null);
   const [isMapOpen, setIsMapOpen] = useState(false);
-  const [playerPos, setPlayerPos] = useState<{ x: number; y: number } | null>(null);
-  const [clues, setClues] = useState<Record<string, NpcClues>>({});
-  const [modelVariant, setModelVariant] = useState<"prompt_engineered" | "finetuned">(
-    "prompt_engineered"
+  const [playerPos, setPlayerPos] = useState<{ x: number; y: number } | null>(
+    null,
   );
+  const [clues, setClues] = useState<Record<string, NpcClues>>({});
+  const [modelVariant, setModelVariant] = useState<
+    "prompt_engineered" | "finetuned"
+  >("prompt_engineered");
 
   // ── Game state ───────────────────────────────────────────────────────────────
   const [gamePhase, setGamePhase] = useState<GamePhase>("playing");
-  const [loseReason, setLoseReason] = useState<"time" | "attempts" | null>(null);
+  const [loseReason, setLoseReason] = useState<"time" | "attempts" | null>(
+    null,
+  );
   const [currentDay, setCurrentDay] = useState(1);
   const [totalDays, setTotalDays] = useState(3);
   const [dayElapsedMs, setDayElapsedMs] = useState(0);
   const [arrestAttempts, setArrestAttempts] = useState(0);
   const [questTitle, setQuestTitle] = useState("The Stolen Mona Lisa");
-  const [questSolution, setQuestSolution] = useState<Record<string, string> | null>(null);
+  const [questSolution, setQuestSolution] = useState<Record<
+    string,
+    string
+  > | null>(null);
 
   // Refs for values used inside setInterval (avoid stale closure)
   const gamePhaseRef = useRef<GamePhase>("playing");
@@ -72,17 +84,28 @@ export default function App() {
   const timerPausedRef = useRef(false);
 
   // Keep refs in sync with state
-  useEffect(() => { gamePhaseRef.current = gamePhase; }, [gamePhase]);
-  useEffect(() => { currentDayRef.current = currentDay; }, [currentDay]);
-  useEffect(() => { totalDaysRef.current = totalDays; }, [totalDays]);
-  useEffect(() => { dayElapsedMsRef.current = dayElapsedMs; }, [dayElapsedMs]);
+  useEffect(() => {
+    gamePhaseRef.current = gamePhase;
+  }, [gamePhase]);
+  useEffect(() => {
+    currentDayRef.current = currentDay;
+  }, [currentDay]);
+  useEffect(() => {
+    totalDaysRef.current = totalDays;
+  }, [totalDays]);
+  useEffect(() => {
+    dayElapsedMsRef.current = dayElapsedMs;
+  }, [dayElapsedMs]);
 
   // Keep appStateRef in sync
-  useEffect(() => { appStateRef.current = appState; }, [appState]);
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
 
   // Pause timer whenever a panel is open or not yet playing
   useEffect(() => {
-    timerPausedRef.current = activeNPC !== null || isMapOpen || appState !== "playing";
+    timerPausedRef.current =
+      activeNPC !== null || isMapOpen || appState !== "playing";
   }, [activeNPC, isMapOpen, appState]);
 
   // ── Game timer (1-second tick) ───────────────────────────────────────────────
@@ -105,7 +128,9 @@ export default function App() {
           setDayElapsedMs(0);
 
           // Update Phaser title
-          const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+          const scene = gameRef.current?.scene.getScene(
+            "ParisScene",
+          ) as ParisScene | null;
           scene?.setDayLabel(nextDay);
         } else {
           // Out of days → lose
@@ -122,9 +147,16 @@ export default function App() {
         const phase = getTimeOfDay(dayProgress);
         const phaseProgress = getPhaseProgress(dayProgress);
         const timeLeftSec = Math.ceil((DAY_DURATION_MS - nextElapsed) / 1000);
-        const danger = getDangerOverlay(currentDayRef.current, totalDaysRef.current, timeLeftSec);
-        const { color, alpha } = danger ?? getDayNightOverlay(phase, phaseProgress);
-        const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+        const danger = getDangerOverlay(
+          currentDayRef.current,
+          totalDaysRef.current,
+          timeLeftSec,
+        );
+        const { color, alpha } =
+          danger ?? getDayNightOverlay(phase, phaseProgress);
+        const scene = gameRef.current?.scene.getScene(
+          "ParisScene",
+        ) as ParisScene | null;
         scene?.setDayNightOverlay(color, alpha);
       }
     }, TICK_MS);
@@ -136,7 +168,10 @@ export default function App() {
   const dayProgress = dayElapsedMs / DAY_DURATION_MS;
   const timeOfDay: TimeOfDay = getTimeOfDay(dayProgress);
   const timeOfDayLabel = `${TIME_OF_DAY_ICONS[timeOfDay]} ${timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)}`;
-  const dayTimeLeftSec = Math.max(0, Math.ceil((DAY_DURATION_MS - dayElapsedMs) / 1000));
+  const dayTimeLeftSec = Math.max(
+    0,
+    Math.ceil((DAY_DURATION_MS - dayElapsedMs) / 1000),
+  );
 
   // ── Start handler (triggered by TitleScreen) ─────────────────────────────────
   const handleStart = useCallback(async () => {
@@ -163,7 +198,9 @@ export default function App() {
     // Quest loaded → start camera pan
     setAppState("camera_pan");
     appStateRef.current = "camera_pan";
-    const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+    const scene = gameRef.current?.scene.getScene(
+      "ParisScene",
+    ) as ParisScene | null;
     scene?.panToInspector(() => {
       setAppState("intro");
       appStateRef.current = "intro";
@@ -171,14 +208,19 @@ export default function App() {
   }, []);
 
   // ── Intro complete handler ───────────────────────────────────────────────────
-  const handleIntroComplete = useCallback((title: string, _firstLead: string) => {
-    if (title) setQuestTitle(title);
-    setAppState("playing");
-    appStateRef.current = "playing";
-    // Re-enable movement now that the intro is dismissed
-    const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
-    scene?.setMovementEnabled(true);
-  }, []);
+  const handleIntroComplete = useCallback(
+    (title: string, _firstLead: string) => {
+      if (title) setQuestTitle(title);
+      setAppState("playing");
+      appStateRef.current = "playing";
+      // Re-enable movement now that the intro is dismissed
+      const scene = gameRef.current?.scene.getScene(
+        "ParisScene",
+      ) as ParisScene | null;
+      scene?.setMovementEnabled(true);
+    },
+    [],
+  );
 
   // ── Arrest outcome handler ───────────────────────────────────────────────────
   const handleArrestAttempt = useCallback(
@@ -199,29 +241,45 @@ export default function App() {
         }
       }
     },
-    [arrestAttempts]
+    [arrestAttempts],
   );
 
   // ── Phaser / React bridge ────────────────────────────────────────────────────
   const setSceneMovement = useCallback((enabled: boolean) => {
-    const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+    const scene = gameRef.current?.scene.getScene(
+      "ParisScene",
+    ) as ParisScene | null;
     scene?.setMovementEnabled(enabled);
   }, []);
 
-  const handleZoneClicked = useCallback((event: ZoneClickedEvent) => {
-    if (event.category === "person") {
-      setPersonGreeting(event.greeting ?? "");
-      return;
-    }
-    setActiveNPC({ id: event.npcId, name: event.npcName, category: event.category });
-    setSceneMovement(false);
-  }, [setSceneMovement]);
+  const handleZoneClicked = useCallback(
+    (event: ZoneClickedEvent) => {
+      if (event.category === "person") {
+        setPersonGreeting(event.greeting ?? "");
+        return;
+      }
+      setActiveNPC({
+        id: event.npcId,
+        name: event.npcName,
+        category: event.category,
+      });
+      setSceneMovement(false);
+    },
+    [setSceneMovement],
+  );
 
-  function handleClueDiscovered(npcId: string, npcName: string, keyword: string) {
+  function handleClueDiscovered(
+    npcId: string,
+    npcName: string,
+    keyword: string,
+  ) {
     setClues((prev) => {
       const existing = prev[npcId] ?? { name: npcName, keywords: [] };
       if (existing.keywords.includes(keyword)) return prev;
-      return { ...prev, [npcId]: { name: npcName, keywords: [...existing.keywords, keyword] } };
+      return {
+        ...prev,
+        [npcId]: { name: npcName, keywords: [...existing.keywords, keyword] },
+      };
     });
   }
 
@@ -261,7 +319,9 @@ export default function App() {
         postBoot: (game) => {
           // Zoom out to show the full city as the title screen backdrop
           setTimeout(() => {
-            const scene = game.scene.getScene("ParisScene") as ParisScene | null;
+            const scene = game.scene.getScene(
+              "ParisScene",
+            ) as ParisScene | null;
             scene?.setMovementEnabled(false);
             scene?.zoomOutToCity();
           }, 500);
@@ -309,7 +369,9 @@ export default function App() {
             boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
           }}
           onClick={() => {
-            const scene = gameRef.current?.scene.getScene("ParisScene") as ParisScene | null;
+            const scene = gameRef.current?.scene.getScene(
+              "ParisScene",
+            ) as ParisScene | null;
             if (scene) setPlayerPos(scene.getPlayerPosition());
             setIsMapOpen(true);
           }}
@@ -323,7 +385,9 @@ export default function App() {
           clues={clues}
           modelVariant={modelVariant}
           onToggleModel={() =>
-            setModelVariant((v) => (v === "prompt_engineered" ? "finetuned" : "prompt_engineered"))
+            setModelVariant((v) =>
+              v === "prompt_engineered" ? "finetuned" : "prompt_engineered",
+            )
           }
           currentDay={currentDay}
           totalDays={totalDays}
@@ -340,7 +404,10 @@ export default function App() {
           npcName={activeNPC.name}
           sessionId={SESSION_ID}
           modelVariant={modelVariant}
-          onClose={() => { setActiveNPC(null); setSceneMovement(true); }}
+          onClose={() => {
+            setActiveNPC(null);
+            setSceneMovement(true);
+          }}
           onClueDiscovered={handleClueDiscovered}
           isInspector={activeNPC.id === "inspector"}
           arrestAttempts={arrestAttempts}
@@ -415,8 +482,20 @@ export default function App() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-              <h2 style={{ color: "#d4af37", margin: 0, fontFamily: "Georgia, serif" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 16,
+              }}
+            >
+              <h2
+                style={{
+                  color: "#d4af37",
+                  margin: 0,
+                  fontFamily: "Georgia, serif",
+                }}
+              >
                 🗺️ City Map — Paris 1900
               </h2>
               <button
@@ -436,7 +515,9 @@ export default function App() {
 
             {/* Map Grid Visualization */}
             <div
-              ref={(el) => { mapGridRef.current = el; }}
+              ref={(el) => {
+                mapGridRef.current = el;
+              }}
               style={{
                 flex: 1,
                 background: "#4a3e28",
@@ -459,18 +540,26 @@ export default function App() {
 
               {/* Row 1 */}
               <div style={mapStyles.house}>House</div>
-              <div style={{ ...mapStyles.park, gridColumn: "span 2" }}>🌳 Park</div>
-              <div style={{ ...mapStyles.house, gridColumn: "span 2" }}>Houses</div>
+              <div style={{ ...mapStyles.park, gridColumn: "span 2" }}>
+                🌳 Park
+              </div>
+              <div style={{ ...mapStyles.house, gridColumn: "span 2" }}>
+                Houses
+              </div>
 
               {/* Row 2 */}
               <div style={mapStyles.house}>House</div>
               <div style={mapStyles.house}>House</div>
               <div style={mapStyles.cell}>💃 Moulin Rouge</div>
-              <div style={{ ...mapStyles.house, gridRow: "span 2" }}>Large House</div>
+              <div style={{ ...mapStyles.house, gridRow: "span 2" }}>
+                Large House
+              </div>
               <div style={mapStyles.house}>House</div>
 
               {/* Row 3 */}
-              <div style={{ ...mapStyles.cell, gridColumn: "span 3" }}>⚖️ Prefecture</div>
+              <div style={{ ...mapStyles.cell, gridColumn: "span 3" }}>
+                ⚖️ Prefecture
+              </div>
               {/* Col 3 is Large House span */}
               <div style={mapStyles.cell}>🎨 Atelier</div>
 
@@ -496,8 +585,16 @@ export default function App() {
               )}
             </div>
 
-            <div style={{ marginTop: 16, color: "#a89060", fontSize: 13, fontStyle: "italic" }}>
-              Highlighted zones are key investigation sites. Explore the city to find all witnesses.
+            <div
+              style={{
+                marginTop: 16,
+                color: "#a89060",
+                fontSize: 13,
+                fontStyle: "italic",
+              }}
+            >
+              Highlighted zones are key investigation sites. Explore the city to
+              find all witnesses.
             </div>
           </div>
         </div>

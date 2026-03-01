@@ -1,374 +1,35 @@
 import Phaser from "phaser";
-
-const TILE_URL = new URL("../assets/tile.png", import.meta.url).href;
-const GRASS_URL = new URL("../assets/grass.png", import.meta.url).href;
-
-// Resolve idle frame URLs at build time via Vite's import.meta.url pattern
-const BAKER_FRAMES: string[] = [
-  new URL("../assets/baker/idle/frame_000.png", import.meta.url).href,
-  new URL("../assets/baker/idle/frame_001.png", import.meta.url).href,
-  new URL("../assets/baker/idle/frame_002.png", import.meta.url).href,
-  new URL("../assets/baker/idle/frame_003.png", import.meta.url).href,
-];
-
-const TAVERN_KEEPER_FRAMES: string[] = [
-  new URL("../assets/tavern_keeper/idle/frame_000.png", import.meta.url).href,
-  new URL("../assets/tavern_keeper/idle/frame_001.png", import.meta.url).href,
-  new URL("../assets/tavern_keeper/idle/frame_002.png", import.meta.url).href,
-  new URL("../assets/tavern_keeper/idle/frame_003.png", import.meta.url).href,
-];
-
-const GUARD_FRAMES: string[] = [
-  new URL("../assets/guard/idle/frame_000.png", import.meta.url).href,
-  new URL("../assets/guard/idle/frame_001.png", import.meta.url).href,
-  new URL("../assets/guard/idle/frame_002.png", import.meta.url).href,
-  new URL("../assets/guard/idle/frame_003.png", import.meta.url).href,
-];
-
-const DANCER_FRAMES: string[] = [
-  new URL("../assets/dancer/idle/frame_000.png", import.meta.url).href,
-  new URL("../assets/dancer/idle/frame_001.png", import.meta.url).href,
-  new URL("../assets/dancer/idle/frame_002.png", import.meta.url).href,
-  new URL("../assets/dancer/idle/frame_003.png", import.meta.url).href,
-];
-
-const INSPECTOR_FRAMES: string[] = [
-  new URL("../assets/inspector/idle/south/frame_000.png", import.meta.url).href,
-  new URL("../assets/inspector/idle/south/frame_001.png", import.meta.url).href,
-  new URL("../assets/inspector/idle/south/frame_002.png", import.meta.url).href,
-  new URL("../assets/inspector/idle/south/frame_003.png", import.meta.url).href,
-];
-
-const ARTIST_FRAMES: string[] = [
-  new URL("../assets/artist/idle/frame_000.png", import.meta.url).href,
-  new URL("../assets/artist/idle/frame_001.png", import.meta.url).href,
-  new URL("../assets/artist/idle/frame_002.png", import.meta.url).href,
-  new URL("../assets/artist/idle/frame_003.png", import.meta.url).href,
-];
-
-const MAIN_IDLE_FRAMES: string[] = [
-  new URL("../assets/main/idle/frame_000.png", import.meta.url).href,
-];
-const MAIN_WALK_FRAMES: string[] = [
-  new URL("../assets/main/walk/frame_000.png", import.meta.url).href,
-  new URL("../assets/main/walk/frame_001.png", import.meta.url).href,
-  new URL("../assets/main/walk/frame_002.png", import.meta.url).href,
-  new URL("../assets/main/walk/frame_003.png", import.meta.url).href,
-  new URL("../assets/main/walk/frame_004.png", import.meta.url).href,
-  new URL("../assets/main/walk/frame_005.png", import.meta.url).href,
-];
-const MAIN_WALK_UP_FRAMES: string[] = [
-  new URL("../assets/main/walk-up/frame_000.png", import.meta.url).href,
-  new URL("../assets/main/walk-up/frame_001.png", import.meta.url).href,
-  new URL("../assets/main/walk-up/frame_002.png", import.meta.url).href,
-  new URL("../assets/main/walk-up/frame_003.png", import.meta.url).href,
-  new URL("../assets/main/walk-up/frame_004.png", import.meta.url).href,
-  new URL("../assets/main/walk-up/frame_005.png", import.meta.url).href,
-];
-const MAIN_WALK_DOWN_FRAMES: string[] = [
-  new URL("../assets/main/walk-down/frame_000.png", import.meta.url).href,
-  new URL("../assets/main/walk-down/frame_001.png", import.meta.url).href,
-  new URL("../assets/main/walk-down/frame_002.png", import.meta.url).href,
-  new URL("../assets/main/walk-down/frame_003.png", import.meta.url).href,
-  new URL("../assets/main/walk-down/frame_004.png", import.meta.url).href,
-  new URL("../assets/main/walk-down/frame_005.png", import.meta.url).href,
-];
-
-export type ZoneId =
-  | "baker"
-  | "guard"
-  | "tavern_keeper"
-  | "cabaret_dancer"
-  | "inspector"
-  | "artist"
-  | "person_passerby"
-  | "person_shopkeeper"
-  | "person_flaneur";
-
-export type ZoneCategory = "original" | "belle_epoque" | "person";
-
-export interface ZoneClickedEvent {
-  npcId: ZoneId;
-  npcName: string;
-  category: ZoneCategory;
-  greeting?: string;
-}
-
-interface Zone {
-  id: ZoneId;
-  label: string;
-  npcName: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: number;
-  hoverColor: number;
-  borderColor: number;
-  icon: string;
-  category: ZoneCategory;
-  greeting?: string;
-}
-
-const MAP_SCALE = 0.8;
-const MAP_WIDTH = Math.round(3200 * MAP_SCALE);
-const MAP_HEIGHT = Math.round(2400 * MAP_SCALE);
-const PLAYER_SPEED = 250;
-// Collision box is intentionally narrower than the visual sprite so the player
-// can pass through door gaps. Door is ~64 px wide; keep player box well under that.
-const PLAYER_WIDTH = Math.round(36 * MAP_SCALE);
-const PLAYER_HEIGHT = Math.round(36 * MAP_SCALE);
-// Grid constants for the layout
-const GRID_COLS = 5;
-const GRID_ROWS = 4;
-const CELL_W = MAP_WIDTH / GRID_COLS;
-const CELL_H = MAP_HEIGHT / GRID_ROWS;
-
-const ZONES: Zone[] = [
-  // ROW 0
-  {
-    id: "baker",
-    label: "La Boulangerie",
-    npcName: "Marie Dupont",
-    x: CELL_W * 0 + 60,
-    y: CELL_H * 0 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
-    color: 0x8b5a2b,
-    hoverColor: 0xa0703a,
-    borderColor: 0x4a6fa5,
-    icon: "🍞",
-    category: "original",
-  },
-  // Row 0, Col 1: House
-  // Row 0, Col 2: House
-  {
-    id: "guard",
-    label: "Poste de Garde",
-    npcName: "Capitaine Renard",
-    x: CELL_W * 3 + 60,
-    y: CELL_H * 0 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
-    color: 0x2c3e6b,
-    hoverColor: 0x3a5080,
-    borderColor: 0x4a6fa5,
-    icon: "⚔️",
-    category: "original",
-  },
-  {
-    id: "tavern_keeper",
-    label: "Taverne du Palais-Royal",
-    npcName: "Jacques Moreau",
-    x: CELL_W * 4 + 60,
-    y: CELL_H * 0 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
-    color: 0x6b2c2c,
-    hoverColor: 0x803a3a,
-    borderColor: 0x4a6fa5,
-    icon: "🍷",
-    category: "original",
-  },
-
-  // ROW 1
-  // Row 1, Col 0: House
-  // Row 1, Col 1-2: Park (Wide)
-  // Row 1, Col 3-4: House (Wide)
-
-  // ROW 2
-  // Row 2, Col 0: House
-  // Row 2, Col 1: House
-  {
-    id: "cabaret_dancer",
-    label: "Le Moulin Rouge",
-    npcName: "Colette Marchand",
-    x: CELL_W * 2 + 60,
-    y: CELL_H * 2 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
-    color: 0x6b2c4a,
-    hoverColor: 0x803a5a,
-    borderColor: 0xd4af37,
-    icon: "💃",
-    category: "belle_epoque",
-  },
-  // Row 2, Col 3: House (Vertical start)
-  // Row 2, Col 4: House
-
-  // ROW 3
-  // Row 3, Col 0-2: Prefecture (Wide)
-  {
-    id: "inspector",
-    label: "Préfecture / Sûreté",
-    npcName: "Inspecteur Gaston Lefèvre",
-    x: CELL_W * 0 + 60,
-    y: CELL_H * 3 + 60,
-    width: CELL_W * 2.5 - 120, // Spans across
-    height: CELL_H - 120,
-    color: 0x2c4a6b,
-    hoverColor: 0x3a5a80,
-    borderColor: 0xd4af37,
-    icon: "🔍",
-    category: "belle_epoque",
-  },
-  // Row 3, Col 3: House (Vertical end)
-  {
-    id: "artist",
-    label: "Montmartre Atelier",
-    npcName: "Henri Toulouse",
-    x: CELL_W * 4 + 60,
-    y: CELL_H * 3 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
-    color: 0x4a3a2c,
-    hoverColor: 0x5a4a3a,
-    borderColor: 0xd4af37,
-    icon: "🎨",
-    category: "belle_epoque",
-  },
-
-  // Person NPCs sprinkled in streets/parks
-  {
-    id: "person_passerby",
-    label: "Un Passant",
-    npcName: "Un passant",
-    x: CELL_W * 1.5,
-    y: CELL_H * 1.5,
-    width: 100,
-    height: 80,
-    color: 0x4a4a4a,
-    hoverColor: 0x5a5a5a,
-    borderColor: 0x888888,
-    icon: "🚶",
-    category: "person",
-    greeting: "Good day! Lovely weather, is it not?",
-  },
-  {
-    id: "person_shopkeeper",
-    label: "Une Marchande",
-    npcName: "Une marchande",
-    x: CELL_W * 3.5,
-    y: CELL_H * 1.2,
-    width: 100,
-    height: 80,
-    color: 0x4a4a4a,
-    hoverColor: 0x5a5a5a,
-    borderColor: 0x888888,
-    icon: "🛒",
-    category: "person",
-    greeting: "Good morning! Buy my flowers...",
-  },
-  {
-    id: "person_flaneur",
-    label: "Un Flâneur",
-    npcName: "Un flâneur",
-    x: CELL_W * 3.5,
-    y: CELL_H * 3.5,
-    width: 100,
-    height: 80,
-    color: 0x4a4a4a,
-    hoverColor: 0x5a5a5a,
-    borderColor: 0x888888,
-    icon: "🎩",
-    category: "person",
-    greeting: "Ah, Paris... what a city! Savour the moment.",
-  },
-];
+import { Zone, ZoneClickedEvent, WallRect, PendingInteraction } from "./types";
+import {
+  TILE_URL,
+  GRASS_URL,
+  CABARET_URL,
+  BAKER_FRAMES,
+  TAVERN_KEEPER_FRAMES,
+  GUARD_FRAMES,
+  DANCER_FRAMES,
+  INSPECTOR_FRAMES,
+  ARTIST_FRAMES,
+  MAIN_IDLE_FRAMES,
+  MAIN_WALK_FRAMES,
+  MAIN_WALK_UP_FRAMES,
+  MAIN_WALK_DOWN_FRAMES,
+  MAP_WIDTH,
+  MAP_HEIGHT,
+  PLAYER_SPEED,
+  PLAYER_WIDTH,
+  PLAYER_HEIGHT,
+  CELL_W,
+  CELL_H,
+  TALK_RADIUS,
+  WALL_THICKNESS,
+  DOOR_WIDTH,
+  CHAR_SCALE,
+} from "./constants";
+import { ZONES } from "./zones";
+import { buildWalls, overlaps } from "./walls";
 
 export { MAP_WIDTH, MAP_HEIGHT };
-
-const TALK_RADIUS = Math.round(150 * MAP_SCALE); // px — player can open dialogue within this distance of NPC center
-
-// Axis-aligned rectangle used for wall collision
-interface WallRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-const WALL_THICKNESS = Math.round(16 * MAP_SCALE);
-// Door must be wider than the player collision box (PLAYER_WIDTH = ~61 px) so the
-// player can actually pass through. Use 80 px to give comfortable clearance.
-const DOOR_WIDTH = Math.round(80 * MAP_SCALE);
-
-/**
- * Build wall segments for a rectangular building.
- * The door is a gap on the specified side (default: "bottom", centered).
- * Returns up to 8 thin wall rects (2 per side, split around the door on the door side).
- */
-function buildWalls(
-  bx: number,
-  by: number,
-  bw: number,
-  bh: number,
-  doorSide: "top" | "bottom" | "left" | "right" = "bottom",
-): WallRect[] {
-  const t = WALL_THICKNESS;
-  const d = DOOR_WIDTH;
-  const walls: WallRect[] = [];
-
-  // Helper: full side segments
-  const top = (): WallRect => ({ x: bx, y: by, w: bw, h: t });
-  const bottom = (): WallRect => ({ x: bx, y: by + bh - t, w: bw, h: t });
-  const left = (): WallRect => ({ x: bx, y: by, w: t, h: bh });
-  const right = (): WallRect => ({ x: bx + bw - t, y: by, w: t, h: bh });
-
-  // Split a horizontal wall around a centered door gap
-  const splitH = (wx: number, wy: number, ww: number): WallRect[] => {
-    const mid = wx + ww / 2;
-    const left = mid - d / 2 - wx;
-    const right = wx + ww - (mid + d / 2);
-    return [
-      { x: wx, y: wy, w: left, h: t },
-      { x: mid + d / 2, y: wy, w: right, h: t },
-    ];
-  };
-
-  // Split a vertical wall around a centered door gap
-  const splitV = (wx: number, wy: number, wh: number): WallRect[] => {
-    const mid = wy + wh / 2;
-    const topH = mid - d / 2 - wy;
-    const bottomH = wy + wh - (mid + d / 2);
-    return [
-      { x: wx, y: wy, w: t, h: topH },
-      { x: wx, y: mid + d / 2, w: t, h: bottomH },
-    ];
-  };
-
-  if (doorSide === "bottom") {
-    walls.push(top(), left(), right(), ...splitH(bx, by + bh - t, bw));
-  } else if (doorSide === "top") {
-    walls.push(...splitH(bx, by, bw), left(), right(), bottom());
-  } else if (doorSide === "left") {
-    walls.push(top(), ...splitV(bx, by, bh), right(), bottom());
-  } else {
-    walls.push(top(), left(), ...splitV(bx + bw - t, by, bh), bottom());
-  }
-  return walls;
-}
-
-/** AABB overlap test */
-function overlaps(
-  ax: number,
-  ay: number,
-  aw: number,
-  ah: number,
-  bx: number,
-  by: number,
-  bw: number,
-  bh: number,
-): boolean {
-  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
-}
-
-interface PendingInteraction {
-  targetX: number;
-  targetY: number;
-  event: ZoneClickedEvent;
-  indicator: Phaser.GameObjects.Graphics;
-}
 
 export class ParisScene extends Phaser.Scene {
   private onZoneClicked!: (event: ZoneClickedEvent) => void;
@@ -385,6 +46,20 @@ export class ParisScene extends Phaser.Scene {
   private indicatorTween: Phaser.Tweens.Tween | null = null;
   private dayNightOverlay!: Phaser.GameObjects.Rectangle;
   private titleText!: Phaser.GameObjects.Text;
+  private cabaretExteriorImg: Phaser.GameObjects.Image | null = null;
+  private cabaretInterior: Phaser.GameObjects.Container | null = null;
+  /** World rect of the cabaret interior (80% zone), for walls and door. */
+  private cabaretInteriorBounds: {
+    ix: number;
+    iy: number;
+    iw: number;
+    ih: number;
+  } | null = null;
+  /** When true, interior walls are in this.walls and exit is only via door. */
+  private insideCabaret = false;
+  /** Wall rects added when entering the cabaret; removed on exit. */
+  private cabaretInteriorWalls: WallRect[] = [];
+  private keyE!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super({ key: "ParisScene" });
@@ -455,18 +130,24 @@ export class ParisScene extends Phaser.Scene {
     const targetY = inspectorZone.y + inspectorZone.height / 2;
 
     this.cameras.main.pan(targetX, targetY, 2200, "Sine.easeInOut");
-    // Zoom back to 1:1 pixel ratio — the player sprites are already scaled for this
-    this.cameras.main.zoomTo(1.0, 2200, "Sine.easeInOut", false, (_cam, progress) => {
-      if (progress === 1) {
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-        onComplete();
-      }
-    });
+    this.cameras.main.zoomTo(
+      1.4,
+      2200,
+      "Sine.easeInOut",
+      false,
+      (_cam, progress) => {
+        if (progress === 1) {
+          this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+          onComplete();
+        }
+      },
+    );
   }
 
   preload() {
     this.load.image("tile", TILE_URL);
     this.load.image("grass", GRASS_URL);
+    this.load.image("cabaret_building", CABARET_URL);
     BAKER_FRAMES.forEach((url, i) => {
       this.load.image(`baker_idle_${i}`, url);
     });
@@ -552,6 +233,7 @@ export class ParisScene extends Phaser.Scene {
       left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
+    this.keyE = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
     // Register idle animations (4 frames at 6 fps)
     this.anims.create({
@@ -632,7 +314,7 @@ export class ParisScene extends Phaser.Scene {
     const spawnX = inspectorZone.x + inspectorZone.width / 2 + 50;
     const spawnY = inspectorZone.y + inspectorZone.height / 2 - 10;
     this.player = this.add.sprite(spawnX, spawnY, "main_idle_0");
-    this.player.setScale(1.6 * MAP_SCALE);
+    this.player.setScale(CHAR_SCALE);
     this.player.setDepth(10);
     this.player.play("main_idle");
     this.children.bringToTop(this.player);
@@ -758,11 +440,16 @@ export class ParisScene extends Phaser.Scene {
 
       if (dist <= 8) {
         // Arrived — fire dialogue and clean up
+        const { useEnterAnimation, exteriorImg, interior } = this.pendingInteraction;
         this.pendingInteraction = null;
         this.indicatorTween?.stop();
         this.indicatorTween = null;
         indicator.destroy();
-        this.onZoneClicked(event);
+        if (useEnterAnimation && exteriorImg && interior) {
+          this.playEnterBuildingAnimation(event, exteriorImg, interior);
+        } else {
+          this.onZoneClicked(event);
+        }
       } else {
         // Move toward target (bypass wall collision so player doesn't get stuck)
         const speed = PLAYER_SPEED * dt;
@@ -805,6 +492,28 @@ export class ParisScene extends Phaser.Scene {
         this.pendingInteraction = null;
       }
       return;
+    }
+
+    // When inside the cabaret, only exit via the door (E key near door)
+    if (
+      this.insideCabaret &&
+      this.cabaretExteriorImg &&
+      this.cabaretInterior &&
+      this.cabaretInteriorBounds
+    ) {
+      const b = this.cabaretInteriorBounds;
+      const doorX = b.ix + b.iw / 2;
+      const doorY = b.iy + b.ih - 25;
+      const distToDoor = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        doorX,
+        doorY,
+      );
+      if (distToDoor < 50 && Phaser.Input.Keyboard.JustDown(this.keyE)) {
+        this.playExitBuildingAnimation(this.cabaretExteriorImg, this.cabaretInterior);
+        return;
+      }
     }
 
     // Normal manual movement
@@ -889,6 +598,81 @@ export class ParisScene extends Phaser.Scene {
     };
   }
 
+  /**
+   * Play an enter-building animation (zoom in + fade to black) then fire the
+   * zone event. On the black frame, swaps the exterior image for the interior
+   * container so the fade-in reveals the inside of the building.
+   */
+  private playEnterBuildingAnimation(
+    event: ZoneClickedEvent,
+    exteriorImg: Phaser.GameObjects.Image,
+    interior: Phaser.GameObjects.Container,
+  ) {
+    const cam = this.cameras.main;
+    cam.zoomTo(2.2, 400, "Sine.easeIn");
+    this.time.delayedCall(350, () => {
+      cam.fade(
+        300,
+        0,
+        0,
+        0,
+        false,
+        (_cam: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+          if (progress === 1) {
+            // Swap exterior → interior while screen is black
+            exteriorImg.setVisible(false);
+            interior.setVisible(true);
+            this.children.bringToTop(interior);
+            this.children.bringToTop(this.player);
+
+            // Add interior walls so the player is confined and can only leave via the door
+            const bounds = this.cabaretInteriorBounds;
+            if (bounds) {
+              const { ix, iy, iw, ih } = bounds;
+              this.cabaretInteriorWalls = buildWalls(ix, iy, iw, ih, "bottom");
+              this.walls.push(...this.cabaretInteriorWalls);
+              this.insideCabaret = true;
+              // Place player just inside the room (center, above the door)
+              this.player.setPosition(ix + iw / 2, iy + ih - 50);
+            }
+
+            cam.zoomTo(1.4, 0);
+            cam.fadeIn(250, 0, 0, 0);
+            this.onZoneClicked(event);
+          }
+        },
+      );
+    });
+  }
+
+  /**
+   * Play the inverse of the enter animation: fade to black, hide interior and
+   * show exterior, remove interior walls, place player outside the door, fade in.
+   */
+  private playExitBuildingAnimation(
+    exteriorImg: Phaser.GameObjects.Image,
+    interior: Phaser.GameObjects.Container,
+  ) {
+    const cam = this.cameras.main;
+    cam.fade(300, 0, 0, 0, false, (_cam: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+      if (progress === 1) {
+        interior.setVisible(false);
+        exteriorImg.setVisible(true);
+
+        // Remove interior walls and clear state
+        this.walls = this.walls.filter((w) => !this.cabaretInteriorWalls.includes(w));
+        this.cabaretInteriorWalls = [];
+        this.insideCabaret = false;
+
+        // Place player just outside the door (bottom center of interior)
+        const b = this.cabaretInteriorBounds!;
+        this.player.setPosition(b.ix + b.iw / 2, b.iy + b.ih + 35);
+
+        cam.fadeIn(250, 0, 0, 0);
+      }
+    });
+  }
+
   /** Creates a pulsing destination indicator at world position (wx, wy). */
   private createDestinationIndicator(
     wx: number,
@@ -917,8 +701,11 @@ export class ParisScene extends Phaser.Scene {
   }
 
   private createZone(zone: Zone) {
-    // Register walls for this building (skip person NPCs — they're open sprites)
-    if (zone.category !== "person") {
+    const isCabaret = zone.id === "cabaret_dancer";
+
+    // Register walls for this building (skip person NPCs and cabaret — the
+    // cabaret uses a pixel-art image so no separate wall geometry is needed)
+    if (zone.category !== "person" && !isCabaret) {
       const zoneWalls = buildWalls(
         zone.x,
         zone.y,
@@ -947,31 +734,92 @@ export class ParisScene extends Phaser.Scene {
 
     const container = this.add.container(zone.x, zone.y);
 
-    const bg = this.add
-      .rectangle(
+    // For the cabaret use the real building image; all others use a coloured rectangle
+    let bgRect: Phaser.GameObjects.Rectangle | null = null;
+    let bgImg: Phaser.GameObjects.Image | null = null;
+    if (isCabaret) {
+      bgImg = this.add.image(
         zone.width / 2,
         zone.height / 2,
-        zone.width,
-        zone.height,
-        zone.color,
-      )
-      .setStrokeStyle(2, zone.borderColor);
+        "cabaret_building",
+      );
+      // Scale the image to fill the zone exactly
+      bgImg.setDisplaySize(zone.width, zone.height);
+    } else {
+      bgRect = this.add
+        .rectangle(
+          zone.width / 2,
+          zone.height / 2,
+          zone.width,
+          zone.height,
+          zone.color,
+        )
+        .setStrokeStyle(2, zone.borderColor);
+    }
 
-    // Building label (top area)
-    const label = this.add
-      .text(zone.width / 2, 24, zone.label, {
-        fontSize: "12px",
-        color: "#f0e6c8",
-        fontFamily: "Georgia, serif",
-        wordWrap: { width: zone.width - 16 },
-        align: "center",
-      })
-      .setOrigin(0.5, 0);
+    // Building label — skip for cabaret (the image already shows the name)
+    if (!isCabaret && bgRect) {
+      const label = this.add
+        .text(zone.width / 2, 24, zone.label, {
+          fontSize: "12px",
+          color: "#f0e6c8",
+          fontFamily: "Georgia, serif",
+          wordWrap: { width: zone.width - 16 },
+          align: "center",
+        })
+        .setOrigin(0.5, 0);
+      container.add([bgRect, label]);
+    } else if (bgImg) {
+      container.add([bgImg]);
+    }
 
-    container.add([bg, label]);
+    // Interior room — hidden until the player enters the cabaret.
+    // Sized at 80% of the zone, centred on the same world position.
+    if (isCabaret) {
+      const iw = zone.width * 0.8;
+      const ih = zone.height * 0.8;
+      const ix = zone.x + (zone.width - iw) / 2;
+      const iy = zone.y + (zone.height - ih) / 2;
+
+      const interiorContainer = this.add.container(ix, iy);
+
+      const floor = this.add
+        .rectangle(iw / 2, ih / 2, iw, ih, 0x2a1a0e)
+        .setStrokeStyle(3, zone.borderColor);
+
+      // Warm ambient light strip along the top (stage lighting feel)
+      const stageLight = this.add.graphics();
+      stageLight.fillStyle(0x6b2c4a, 0.6);
+      stageLight.fillRect(0, 0, iw, ih * 0.18);
+
+      // Stage platform at the bottom third
+      const stage = this.add.graphics();
+      stage.fillStyle(0x5a3a1a, 1);
+      stage.fillRect(iw * 0.1, ih * 0.6, iw * 0.8, ih * 0.08);
+      stage.lineStyle(1, 0xd4af37, 0.7);
+      stage.strokeRect(iw * 0.1, ih * 0.6, iw * 0.8, ih * 0.08);
+
+      // Interior label
+      const interiorLabel = this.add
+        .text(iw / 2, 14, "Le Moulin Rouge", {
+          fontSize: "11px",
+          color: "#d4af37",
+          fontFamily: "Georgia, serif",
+          fontStyle: "italic",
+        })
+        .setOrigin(0.5, 0);
+
+      interiorContainer.add([floor, stageLight, stage, interiorLabel]);
+      interiorContainer.setVisible(false);
+
+      this.cabaretExteriorImg = bgImg;
+      this.cabaretInterior = interiorContainer;
+      this.cabaretInteriorBounds = { ix, iy, iw, ih };
+    }
 
     // Door — drawn on top of the building fill, inside the container (local coords)
-    if (zone.category !== "person") {
+    // Skip for cabaret: the door is part of the building image
+    if (zone.category !== "person" && !isCabaret) {
       const doorG = this.add.graphics();
       const doorX = zone.width / 2 - DOOR_WIDTH / 2;
       const doorY = zone.height - WALL_THICKNESS;
@@ -1002,32 +850,32 @@ export class ParisScene extends Phaser.Scene {
     if (zone.id === "baker") {
       // Pixel-art sprite — scale up 1.5× from 48×48 (renders at 72×72)
       const sprite = this.add.sprite(npcCX, npcCY, "baker_idle_0");
-      sprite.setScale(1.5 * MAP_SCALE);
+      sprite.setScale(CHAR_SCALE);
       sprite.play("baker_idle");
       npcVisual = sprite;
     } else if (zone.id === "tavern_keeper") {
       const sprite = this.add.sprite(npcCX, npcCY, "tavern_keeper_idle_0");
-      sprite.setScale(1.6 * MAP_SCALE);
+      sprite.setScale(CHAR_SCALE);
       sprite.play("tavern_keeper_idle");
       npcVisual = sprite;
     } else if (zone.id === "guard") {
       const sprite = this.add.sprite(npcCX, npcCY, "guard_idle_0");
-      sprite.setScale(1.6 * MAP_SCALE);
+      sprite.setScale(CHAR_SCALE);
       sprite.play("guard_idle");
       npcVisual = sprite;
     } else if (zone.id === "cabaret_dancer") {
       const sprite = this.add.sprite(npcCX, npcCY, "dancer_idle_0");
-      sprite.setScale(1.6 * MAP_SCALE);
+      sprite.setScale(CHAR_SCALE);
       sprite.play("dancer_idle");
       npcVisual = sprite;
     } else if (zone.id === "inspector") {
       const sprite = this.add.sprite(npcCX, npcCY, "inspector_idle_0");
-      sprite.setScale(1.6 * MAP_SCALE);
+      sprite.setScale(CHAR_SCALE);
       sprite.play("inspector_idle");
       npcVisual = sprite;
     } else if (zone.id === "artist") {
       const sprite = this.add.sprite(npcCX, npcCY, "artist_idle_0");
-      sprite.setScale(1.6 * MAP_SCALE);
+      sprite.setScale(CHAR_SCALE);
       sprite.play("artist_idle");
       npcVisual = sprite;
     } else {
@@ -1092,7 +940,12 @@ export class ParisScene extends Phaser.Scene {
           duration: 100,
         });
       }
-      bg.setFillStyle(zone.hoverColor);
+      // Image backgrounds (cabaret) don't support setFillStyle — tint instead
+      if (bgImg) {
+        bgImg.setTint(0xffddaa);
+      } else if (bgRect) {
+        bgRect.setFillStyle(zone.hoverColor);
+      }
     });
 
     hitArea.on("pointerout", () => {
@@ -1104,7 +957,11 @@ export class ParisScene extends Phaser.Scene {
           duration: 100,
         });
       }
-      bg.setFillStyle(zone.color);
+      if (bgImg) {
+        bgImg.clearTint();
+      } else if (bgRect) {
+        bgRect.setFillStyle(zone.color);
+      }
     });
 
     hitArea.on("pointerdown", () => {
@@ -1127,8 +984,16 @@ export class ParisScene extends Phaser.Scene {
 
       // Check proximity to stand point
       if (this.isNearNPC(stand.x, stand.y)) {
-        this.cameras.main.shake(200, 0.005);
-        this.onZoneClicked(clickEvent);
+        if (isCabaret && this.cabaretExteriorImg && this.cabaretInterior) {
+          this.playEnterBuildingAnimation(
+            clickEvent,
+            this.cabaretExteriorImg,
+            this.cabaretInterior,
+          );
+        } else {
+          this.cameras.main.shake(200, 0.005);
+          this.onZoneClicked(clickEvent);
+        }
       } else {
         // Auto-walk directly to the NPC stand point (bypasses wall collision)
         const indicator = this.createDestinationIndicator(stand.x, stand.y);
@@ -1142,6 +1007,9 @@ export class ParisScene extends Phaser.Scene {
           targetY: stand.y,
           event: clickEvent,
           indicator,
+          useEnterAnimation: isCabaret,
+          exteriorImg: isCabaret ? this.cabaretExteriorImg ?? undefined : undefined,
+          interior: isCabaret ? this.cabaretInterior ?? undefined : undefined,
         };
       }
     });
