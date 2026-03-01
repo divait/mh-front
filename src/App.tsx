@@ -37,7 +37,7 @@ interface ActiveNPC {
 
 export interface NpcClues {
   name: string;
-  keywords: string[];
+  summary: string;  // AI-generated investigator's note for this NPC
 }
 
 export default function App() {
@@ -271,16 +271,13 @@ export default function App() {
   function handleClueDiscovered(
     npcId: string,
     npcName: string,
-    keyword: string,
+    summary: string,
   ) {
-    setClues((prev) => {
-      const existing = prev[npcId] ?? { name: npcName, keywords: [] };
-      if (existing.keywords.includes(keyword)) return prev;
-      return {
-        ...prev,
-        [npcId]: { name: npcName, keywords: [...existing.keywords, keyword] },
-      };
-    });
+    if (!summary) return;
+    setClues((prev) => ({
+      ...prev,
+      [npcId]: { name: npcName, summary },
+    }));
   }
 
   // ── Keyboard dismiss for overlays ────────────────────────────────────────────

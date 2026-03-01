@@ -431,7 +431,7 @@ export class ParisScene extends Phaser.Scene {
       decorGraphics.strokeRect(x, y, w, h);
 
       this.add
-        .text(x + w / 2, y + h / 2, "Park (walkable)", {
+        .text(x + w / 2, y + h / 2, "Park", {
           fontSize: "16px",
           color: "#c8f0c8",
           fontFamily: "Georgia, serif",

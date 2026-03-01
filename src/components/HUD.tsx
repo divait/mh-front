@@ -86,10 +86,10 @@ export function HUD({
           <div style={styles.noClues}>No clues found yet...</div>
         ) : (
           <ul style={styles.clueList}>
-            {Object.entries(clues).map(([npcId, { name, keywords }]) => (
+            {Object.entries(clues).map(([npcId, { name, summary }]) => (
               <li key={npcId} style={styles.clueItem}>
                 <span style={styles.clueNpc}>[{name}]</span>
-                <span style={styles.clueKeywords}>{keywords.join(", ")}</span>
+                <span style={styles.clueSummary}>{summary}</span>
               </li>
             ))}
           </ul>
@@ -212,6 +212,12 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#e8dfc0",
     fontStyle: "italic",
     fontSize: 11,
+  },
+  clueSummary: {
+    color: "#e8dfc0",
+    fontStyle: "italic",
+    fontSize: 11,
+    lineHeight: 1.4,
   },
   modelToggle: {
     background: "rgba(26,18,8,0.92)",

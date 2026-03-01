@@ -13,7 +13,7 @@ interface DialoguePanelProps {
   sessionId: string;
   modelVariant: "prompt_engineered" | "finetuned";
   onClose: () => void;
-  onClueDiscovered: (npcId: string, npcName: string, keyword: string) => void;
+  onClueDiscovered: (npcId: string, npcName: string, summary: string) => void;
   isInspector?: boolean;
   arrestAttempts?: number;
   clues?: Record<string, NpcClues>;
@@ -29,15 +29,6 @@ const NPC_PORTRAITS: Record<string, string> = {
   artist: "🎨",
 };
 
-// Keywords that suggest a clue was discovered (Belle Époque)
-const CLUE_TRIGGERS: Record<string, string[]> = {
-  baker: ["esquisse", "miche", "pain", "caché", "livraison", "louvre"],
-  guard: ["saisir", "ordre", "pamphlet", "disparu", "préfecture", "accès"],
-  tavern_keeper: ["itinéraire", "Renard", "vendu", "regrette", "horaire", "nuit"],
-  cabaret_dancer: ["coulisses", "entré", "passage", "secret", "porte", "moulin"],
-  inspector: ["accès", "suspect", "identité", "dossier", "sûreté", "preuves"],
-  artist: ["motif", "ami", "raison", "montmartre", "besoin", "argent"],
-};
 
 export function DialoguePanel({
   npcId,
@@ -96,14 +87,25 @@ export function DialoguePanel({
 
       setMessages((prev) => [...prev, { role: "npc", content: reply }]);
 
-      // Check for clue keywords in the reply — report ALL matches (grouped in App)
-      const triggers = CLUE_TRIGGERS[npcId] ?? [];
-      const replyLower = reply.toLowerCase();
-      for (const trigger of triggers) {
-        if (replyLower.includes(trigger)) {
-          onClueDiscovered(npcId, npcName, trigger);
-        }
-      }
+      // Non-blocking: ask Mistral to summarise the whole conversation so far into
+      // a crisp investigator's note. The journal entry for this NPC is replaced
+      // each time, so it only ever shows the best / latest distillation.
+      const snapshot = [...messages, { role: "player", content: text }, { role: "npc", content: reply }];
+      fetch("/dialogue/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          npc_id: npcId,
+          npc_name: npcName,
+          conversation: snapshot,
+        }),
+      })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data?.summary) onClueDiscovered(npcId, npcName, data.summary);
+        })
+        .catch(() => {/* ignore — journal update is best-effort */});
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -132,7 +134,7 @@ export function DialoguePanel({
 
     // Flatten Record<npcId, NpcClues> → one string per NPC for evidence summary
     const clueLines = Object.values(clues).map(
-      ({ name, keywords }) => `[${name}] ${keywords.join(", ")}`
+      ({ name, summary }) => `[${name}] ${summary}`
     );
     const attachedClues = clueLines.filter((_, i) => selectedClues.has(i));
     const evidenceSummary =
@@ -285,7 +287,7 @@ export function DialoguePanel({
               <div style={styles.evidenceSection}>
                 <div style={styles.evidenceTitle}>Attach evidence from your journal:</div>
                 <div style={styles.clueCheckboxes}>
-                  {Object.values(clues).map(({ name, keywords }, i) => (
+                  {Object.values(clues).map(({ name, summary }, i) => (
                     <label key={i} style={styles.clueCheckboxLabel}>
                       <input
                         type="checkbox"
@@ -294,7 +296,8 @@ export function DialoguePanel({
                         style={{ marginRight: 6 }}
                       />
                       <span style={styles.clueCheckboxText}>
-                        <strong>[{name}]</strong> {keywords.join(", ")}
+                        <strong>[{name}]</strong>{" "}
+                        {summary.length > 80 ? summary.slice(0, 77) + "…" : summary}
                       </span>
                     </label>
                   ))}
