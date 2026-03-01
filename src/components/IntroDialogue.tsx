@@ -69,6 +69,10 @@ export function IntroDialogue({ sessionId, onComplete }: IntroDialogueProps) {
     return () => clearInterval(typeInterval);
   }, [currentLineIndex, lines, loading]);
 
+  const skipAll = useCallback(() => {
+    onComplete(questTitle, firstLeadNpc);
+  }, [questTitle, firstLeadNpc, onComplete]);
+
   const advance = useCallback(() => {
     if (isTyping) {
       // Skip to end of current line instantly
@@ -118,6 +122,12 @@ export function IntroDialogue({ sessionId, onComplete }: IntroDialogueProps) {
             <div style={styles.speakerRole}>Sûreté — Opening Briefing</div>
           </div>
           <div style={styles.progress}>{lineProgress}</div>
+          <button
+            style={styles.skipButton}
+            onClick={(e) => { e.stopPropagation(); skipAll(); }}
+          >
+            Skip Intro ⏭
+          </button>
         </div>
 
         {/* Dialogue text */}
@@ -262,6 +272,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 15,
     padding: 32,
     textAlign: "center",
+  },
+  skipButton: {
+    marginLeft: 12,
+    background: "none",
+    border: "1px solid #6a5a30",
+    borderRadius: 6,
+    color: "#6a5a30",
+    fontFamily: "Georgia, serif",
+    fontSize: 12,
+    padding: "5px 12px",
+    cursor: "pointer",
+    flexShrink: 0,
+    transition: "border-color 0.15s, color 0.15s",
   },
   questBadge: {
     position: "fixed",
