@@ -26,10 +26,11 @@ import {
   PLAYER_SPEED,
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
-  CELL_W,
-  CELL_H,
   TALK_RADIUS,
   CHAR_SCALE,
+  BUILDING_BOUNDS,
+  getRawXForVisualLeft,
+  getRawYForVisualBottom,
 } from "./constants";
 import { ZONES } from "./zones";
 import { buildWalls, overlaps } from "./walls";
@@ -223,7 +224,7 @@ export class ParisScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(1000);
 
-    this.add
+    const subTitle = this.add
       .text(cam.width / 2, 58, "Move (WASD / arrows) — Click an NPC to talk", {
         fontSize: "13px",
         color: "#a89060",
@@ -232,6 +233,11 @@ export class ParisScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(1000);
+      
+    // Phaser 3 bug: when zooming, setScrollFactor(0) objects still scale and move relative to the zoom center.
+    // To keep them truly fixed to the screen regardless of camera zoom or pan, we need to ignore the camera entirely.
+    (this.titleText as any).setIgnoreCamera?.(cam);
+    (subTitle as any).setIgnoreCamera?.(cam);
 
     // Day/night overlay — full-screen rectangle fixed to camera, updated from React
     this.dayNightOverlay = this.add
@@ -327,7 +333,7 @@ export class ParisScene extends Phaser.Scene {
     // Player — spawn in the street just below the Préfecture, clear of all walls/NPCs
     const inspectorZone = ZONES.find((z) => z.id === "inspector")!;
     const spawnX = inspectorZone.x + inspectorZone.width / 2 + 50;
-    const spawnY = inspectorZone.y + inspectorZone.height / 2 - 10;
+    const spawnY = inspectorZone.y + inspectorZone.height + 40;
     this.player = this.add.sprite(spawnX, spawnY, "main_idle_0");
     this.player.setScale(CHAR_SCALE);
     this.player.setDepth(10);
@@ -342,32 +348,20 @@ export class ParisScene extends Phaser.Scene {
   private createDecorativeZones() {
     const decorGraphics = this.add.graphics();
 
-    // Helper to draw a "House" with walls
-    const drawHouse = (
-      col: number,
-      row: number,
-      colSpan = 1,
-      rowSpan = 1,
-      label = "Maison de Ville",
-    ) => {
-      const x = col * CELL_W + 60;
-      const y = row * CELL_H + 60;
-      const w = CELL_W * colSpan - 120;
-      const h = CELL_H * rowSpan - 120;
-
-      // We alternate between house and house2 for visual variety
-      const bType = (col + row) % 2 === 0 ? "house" : "house2";
+    const drawHouse = (vx: number, vy: number, label = "Maison de Ville") => {
+      // Alternate house images based on coordinates for visual variety
+      const bType = ((vx + vy) / 100) % 2 === 0 ? "house" : "house2";
 
       this.createZone({
-        id: `decor_house_${col}_${row}` as ZoneId,
+        id: `decor_house_${vx}_${vy}` as ZoneId,
         label,
         npcName: "", // Empty so no NPC renders
         category: "belle_epoque",
         icon: "",
-        x: x,
-        y: y,
-        width: w,
-        height: h,
+        x: getRawXForVisualLeft(vx, bType),
+        y: getRawYForVisualBottom(vy, bType),
+        width: 280,
+        height: 280,
         color: 0x3a2a1a,
         hoverColor: 0x4a3a2a,
         borderColor: 0x6a5a30,
@@ -375,13 +369,7 @@ export class ParisScene extends Phaser.Scene {
       });
     };
 
-    // Helper to draw a "Park" — no walls, fully walkable
-    const drawPark = (col: number, row: number, colSpan = 1, rowSpan = 1) => {
-      const x = col * CELL_W + 40;
-      const y = row * CELL_H + 40;
-      const w = CELL_W * colSpan - 80;
-      const h = CELL_H * rowSpan - 80;
-
+    const drawPark = (x: number, y: number, w: number, h: number) => {
       this.add.tileSprite(x + w / 2, y + h / 2, w, h, "grass");
 
       decorGraphics.lineStyle(2, 0x2a4a2a, 0.6);
@@ -398,25 +386,40 @@ export class ParisScene extends Phaser.Scene {
         .setOrigin(0.5);
     };
 
+    const ROW_0_Y = 360;
+    const ROW_1_Y = 740;
+    const ROW_2_Y = 1120;
+
     // ROW 0
-    drawHouse(1, 0);
-    drawHouse(2, 0);
+    drawHouse(80, ROW_0_Y);
+    // Boulangerie starts at visual 151. House width = 131.25. 80 + 131.25 = 211.25.
+    // wait, I can just stack them correctly!
+    // boul is 151, its length (36/64)*280 = 157.5 => end visual 308.5
+    drawHouse(308.5, ROW_0_Y);
+    // house 131.25 => 439.75
+    drawHouse(439.75, ROW_0_Y);
 
     // ROW 1
-    drawHouse(0, 1);
-    drawPark(1, 1, 2, 1);
-    drawHouse(3, 1, 2, 1);
+    drawHouse(80, ROW_1_Y);
+    // Park with horizontal gaps
+    // Left boundary: 211.25 + 60 gap = 271.25
+    // Right boundary: 840 - 60 gap = 780
+    // Width: 780 - 271.25 = 508.75
+    drawPark(271.25, 460, 508.75, 280); 
+    // Prefecture is at 840. length = (64/64)*280 = 280 => 1120.
+    drawHouse(1120, ROW_1_Y);
 
     // ROW 2
-    drawHouse(0, 2);
-    drawHouse(1, 2);
-    drawHouse(3, 2, 1, 2); // Vertical house spanning to Row 3
-    drawHouse(4, 2);
-
-    // ROW 3
-    // Col 0-2 is Prefecture (Agent Zone)
-    // Col 3 is Vertical House end
-    // Col 4 is Artist (Agent Zone)
+    drawHouse(80, ROW_2_Y); // 211.25
+    drawHouse(211.25, ROW_2_Y); // 342.5
+    drawHouse(342.5, ROW_2_Y);
+    // Cabaret is at 450 (which leaves small gap, 450-342.5 = 107.5)
+    
+    // Atelier is at 919. (40/64)*280 = 175 => 1094.
+    // So house before Atelier: end = 919 => start = 919 - 131.25 = 787.75.
+    drawHouse(787.75, ROW_2_Y);
+    // House right of Atelier: start = 1094
+    drawHouse(1094, ROW_2_Y);
   }
 
   update(_time: number, delta: number) {
@@ -750,61 +753,13 @@ export class ParisScene extends Phaser.Scene {
       const bType = zone.buildingType!;
       let hitBox = { bx: zone.x, by: zone.y, bw: zone.width, bh: zone.height };
       
-      if (bType === "cabaret") {
+      const bounds = BUILDING_BOUNDS[bType];
+      if (bounds) {
         hitBox = {
-          bx: zone.x + zone.width * (6 / 64),
-          by: zone.y + zone.height * (2 / 64),
-          bw: zone.width * (52 / 64),
-          bh: zone.height * (60 / 64),
-        };
-      } else if (bType === "house") {
-        hitBox = {
-          bx: zone.x + zone.width * (17 / 64),
-          by: zone.y + zone.height * (1 / 64),
-          bw: zone.width * (30 / 64),
-          bh: zone.height * (62 / 64),
-        };
-      } else if (bType === "house2") {
-        hitBox = {
-          bx: zone.x + zone.width * (18 / 64),
-          by: zone.y + zone.height * (5 / 64),
-          bw: zone.width * (28 / 64),
-          bh: zone.height * (59 / 64),
-        };
-      } else if (bType === "prefecture") {
-        hitBox = {
-          bx: zone.x,
-          by: zone.y + zone.height * (11 / 64),
-          bw: zone.width,
-          bh: zone.height * (46 / 64),
-        };
-      } else if (bType === "boulangerie") {
-        hitBox = {
-          bx: zone.x + zone.width * (14 / 64),
-          by: zone.y + zone.height * (0 / 64),
-          bw: zone.width * (36 / 64),
-          bh: zone.height * (64 / 64),
-        };
-      } else if (bType === "guard_post") {
-        hitBox = {
-          bx: zone.x + zone.width * (8 / 64),
-          by: zone.y + zone.height * (2 / 64),
-          bw: zone.width * (48 / 64),
-          bh: zone.height * (61 / 64),
-        };
-      } else if (bType === "tavern") {
-        hitBox = {
-          bx: zone.x + zone.width * (6 / 64),
-          by: zone.y + zone.height * (3 / 64),
-          bw: zone.width * (51 / 64),
-          bh: zone.height * (58 / 64),
-        };
-      } else if (bType === "atelier") {
-        hitBox = {
-          bx: zone.x + zone.width * (12 / 64),
-          by: zone.y + zone.height * (1 / 64),
-          bw: zone.width * (40 / 64),
-          bh: zone.height * (63 / 64),
+          bx: zone.x + zone.width * (bounds.left / 64),
+          by: zone.y + zone.height * (bounds.top / 64),
+          bw: zone.width * ((bounds.right - bounds.left) / 64),
+          bh: zone.height * ((bounds.bottom - bounds.top) / 64),
         };
       }
 
@@ -812,7 +767,11 @@ export class ParisScene extends Phaser.Scene {
       this.walls.push(...zoneWalls);
 
       bgImg = this.add.image(zone.width / 2, zone.height / 2, bType);
-      bgImg.setDisplaySize(zone.width, zone.height);
+      // Scale to fit zone dimensions while preserving the image's native aspect ratio
+      const nw = bgImg.width;
+      const nh = bgImg.height;
+      const scale = Math.min(zone.width / nw, zone.height / nh);
+      bgImg.setScale(scale);
       container.add([bgImg]);
 
       const iw = zone.width * 0.6;
@@ -988,12 +947,15 @@ export class ParisScene extends Phaser.Scene {
     if (npcIcon) visualItems.splice(1, 0, npcIcon);
     
     // Draw independently of exterior building to allow z-depth sorting
-    const npcContainer = this.add.container(zone.x, zone.y);
-    npcContainer.add(visualItems);
+    // Only add an NPC Container if there's actually an NPC defined
+    if (zone.npcName !== "") {
+      const npcContainer = this.add.container(zone.x, zone.y);
+      npcContainer.add(visualItems);
 
-    if (bData) {
-      npcContainer.setVisible(false);
-      bData.npcContainer = npcContainer;
+      if (bData) {
+        npcContainer.setVisible(false);
+        bData.npcContainer = npcContainer;
+      }
     }
 
     hitArea.on("pointerover", () => {

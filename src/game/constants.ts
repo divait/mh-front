@@ -81,16 +81,40 @@ export const MAIN_WALK_DOWN_FRAMES: string[] = [
 
 export const MAP_SCALE = 0.68; // 15% smaller than the original 0.8
 export const CHAR_SCALE = 1.28;
-export const MAP_WIDTH = Math.round(3200 * MAP_SCALE);
-export const MAP_HEIGHT = Math.round(2400 * MAP_SCALE);
+export const MAP_WIDTH = 1360;
+export const MAP_HEIGHT = 1240;
 export const PLAYER_SPEED = 250;
 export const PLAYER_WIDTH = Math.round(36 * MAP_SCALE);
 export const PLAYER_HEIGHT = Math.round(36 * MAP_SCALE);
-export const GRID_COLS = 5;
-export const GRID_ROWS = 4;
+export const GRID_COLS = 4;
+export const GRID_ROWS = 3;
 export const CELL_W = MAP_WIDTH / GRID_COLS;
 export const CELL_H = MAP_HEIGHT / GRID_ROWS;
 
 export const TALK_RADIUS = Math.round(150 * MAP_SCALE);
 export const WALL_THICKNESS = Math.round(16 * MAP_SCALE);
 export const DOOR_WIDTH = Math.round(80 * MAP_SCALE);
+
+// Coordinates reflect the non-transparent visual pixels of the 64x64 source images.
+export const BUILDING_BOUNDS: Record<string, { left: number, top: number, right: number, bottom: number }> = {
+  house: { left: 17, top: 1, right: 47, bottom: 63 },
+  house2: { left: 18, top: 5, right: 46, bottom: 64 },
+  tavern: { left: 6, top: 3, right: 57, bottom: 61 },
+  boulangerie: { left: 14, top: 0, right: 50, bottom: 64 },
+  cabaret: { left: 6, top: 2, right: 58, bottom: 62 },
+  prefecture: { left: 0, top: 11, right: 64, bottom: 57 },
+  atelier: { left: 12, top: 1, right: 52, bottom: 64 },
+  guard_post: { left: 8, top: 2, right: 56, bottom: 63 }
+};
+
+export function getRawXForVisualLeft(visualLeft: number, bType: string, width: number = 280) {
+  const bounds = BUILDING_BOUNDS[bType];
+  if (!bounds) return visualLeft;
+  return visualLeft - width * (bounds.left / 64);
+}
+
+export function getRawYForVisualBottom(visualBottom: number, bType: string, height: number = 280) {
+  const bounds = BUILDING_BOUNDS[bType];
+  if (!bounds) return visualBottom;
+  return visualBottom - height * (bounds.bottom / 64);
+}

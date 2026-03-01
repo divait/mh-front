@@ -1,5 +1,9 @@
 import { Zone } from "./types";
-import { CELL_W, CELL_H } from "./constants";
+import { getRawXForVisualLeft, getRawYForVisualBottom } from "./constants";
+
+const ROW_0_Y = 360; // visual bottom line
+const ROW_1_Y = 740;
+const ROW_2_Y = 1120;
 
 export const ZONES: Zone[] = [
   // ROW 0
@@ -7,10 +11,10 @@ export const ZONES: Zone[] = [
     id: "baker",
     label: "La Boulangerie",
     npcName: "Marie Dupont",
-    x: CELL_W * 0 + 60,
-    y: CELL_H * 0 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
+    x: getRawXForVisualLeft(151, "boulangerie"),
+    y: getRawYForVisualBottom(ROW_0_Y, "boulangerie"),
+    width: 280,
+    height: 280,
     color: 0x8b5a2b,
     hoverColor: 0xa0703a,
     borderColor: 0x4a6fa5,
@@ -18,16 +22,14 @@ export const ZONES: Zone[] = [
     category: "original",
     buildingType: "boulangerie",
   },
-  // Row 0, Col 1: House
-  // Row 0, Col 2: House
   {
     id: "guard",
     label: "Poste de Garde",
     npcName: "Capitaine Renard",
-    x: CELL_W * 3 + 60,
-    y: CELL_H * 0 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
+    x: getRawXForVisualLeft(1028, "guard_post"),
+    y: getRawYForVisualBottom(ROW_0_Y, "guard_post"),
+    width: 280,
+    height: 280,
     color: 0x2c3e6b,
     hoverColor: 0x3a5080,
     borderColor: 0x4a6fa5,
@@ -39,10 +41,10 @@ export const ZONES: Zone[] = [
     id: "tavern_keeper",
     label: "Taverne du Palais-Royal",
     npcName: "Jacques Moreau",
-    x: CELL_W * 4 + 60,
-    y: CELL_H * 0 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
+    x: getRawXForVisualLeft(840, "tavern"),
+    y: getRawYForVisualBottom(ROW_0_Y, "tavern"),
+    width: 280,
+    height: 280,
     color: 0x6b2c2c,
     hoverColor: 0x803a3a,
     borderColor: 0x4a6fa5,
@@ -52,41 +54,14 @@ export const ZONES: Zone[] = [
   },
 
   // ROW 1
-  // Row 1, Col 0: House
-  // Row 1, Col 1-2: Park (Wide)
-  // Row 1, Col 3-4: House (Wide)
-
-  // ROW 2
-  // Row 2, Col 0: House
-  // Row 2, Col 1: House
-  {
-    id: "cabaret_dancer",
-    label: "Le Moulin Rouge",
-    npcName: "Colette Marchand",
-    x: CELL_W * 2 + 60,
-    y: CELL_H * 2 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
-    color: 0x6b2c4a,
-    hoverColor: 0x803a5a,
-    borderColor: 0xd4af37,
-    icon: "💃",
-    category: "belle_epoque",
-    buildingType: "cabaret",
-  },
-  // Row 2, Col 3: House (Vertical start)
-  // Row 2, Col 4: House
-
-  // ROW 3
-  // Row 3, Col 0-2: Prefecture (Wide)
   {
     id: "inspector",
     label: "Préfecture / Sûreté",
     npcName: "Inspecteur Gaston Lefèvre",
-    x: CELL_W * 0 + 60,
-    y: CELL_H * 3 + 60,
-    width: CELL_W * 2.5 - 120, // Spans across
-    height: CELL_H - 120,
+    x: getRawXForVisualLeft(840, "prefecture"),
+    y: getRawYForVisualBottom(ROW_1_Y, "prefecture"),
+    width: 280,
+    height: 280,
     color: 0x2c4a6b,
     hoverColor: 0x3a5a80,
     borderColor: 0xd4af37,
@@ -94,15 +69,31 @@ export const ZONES: Zone[] = [
     category: "belle_epoque",
     buildingType: "prefecture",
   },
-  // Row 3, Col 3: House (Vertical end)
+
+  // ROW 2
+  {
+    id: "cabaret_dancer",
+    label: "Le Moulin Rouge",
+    npcName: "Colette Marchand",
+    x: getRawXForVisualLeft(450, "cabaret"),
+    y: getRawYForVisualBottom(ROW_2_Y, "cabaret"),
+    width: 280,
+    height: 280,
+    color: 0x6b2c4a,
+    hoverColor: 0x803a5a,
+    borderColor: 0xd4af37,
+    icon: "💃",
+    category: "belle_epoque",
+    buildingType: "cabaret",
+  },
   {
     id: "artist",
     label: "Montmartre Atelier",
     npcName: "Henri Toulouse",
-    x: CELL_W * 4 + 60,
-    y: CELL_H * 3 + 60,
-    width: CELL_W - 120,
-    height: CELL_H - 120,
+    x: getRawXForVisualLeft(919, "atelier"),
+    y: getRawYForVisualBottom(ROW_2_Y, "atelier"),
+    width: 280,
+    height: 280,
     color: 0x4a3a2c,
     hoverColor: 0x5a4a3a,
     borderColor: 0xd4af37,
@@ -116,10 +107,10 @@ export const ZONES: Zone[] = [
     id: "person_passerby",
     label: "Un Passant",
     npcName: "Un passant",
-    x: CELL_W * 1.5,
-    y: CELL_H * 1.5,
-    width: 100,
-    height: 80,
+    x: 600,
+    y: 390,
+    width: 60,
+    height: 60,
     color: 0x4a4a4a,
     hoverColor: 0x5a5a5a,
     borderColor: 0x888888,
@@ -131,10 +122,10 @@ export const ZONES: Zone[] = [
     id: "person_shopkeeper",
     label: "Une Marchande",
     npcName: "Une marchande",
-    x: CELL_W * 3.5,
-    y: CELL_H * 1.2,
-    width: 100,
-    height: 80,
+    x: 400,
+    y: 770,
+    width: 60,
+    height: 60,
     color: 0x4a4a4a,
     hoverColor: 0x5a5a5a,
     borderColor: 0x888888,
@@ -146,15 +137,15 @@ export const ZONES: Zone[] = [
     id: "person_flaneur",
     label: "Un Flâneur",
     npcName: "Un flâneur",
-    x: CELL_W * 3.5,
-    y: CELL_H * 3.5,
-    width: 100,
-    height: 80,
+    x: 600,
+    y: 1120,
+    width: 60,
+    height: 60,
     color: 0x4a4a4a,
     hoverColor: 0x5a5a5a,
     borderColor: 0x888888,
     icon: "🎩",
     category: "person",
-    greeting: "Ah, Paris... what a city! Savour the moment.",
+    greeting: "Ah, Paris... Savour the moment.",
   },
 ];
