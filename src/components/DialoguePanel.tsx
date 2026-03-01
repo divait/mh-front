@@ -61,13 +61,33 @@ export function DialoguePanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+const INITIAL_GREETINGS: Record<string, string> = {
+  baker: "Bonjour... what can I do for you?",
+  guard: "State your business, quickly.",
+  tavern_keeper: "Ah! Welcome, my friend. What can I get you?",
+  cabaret_dancer: "Well, hello there... looking for a show?",
+  inspector: "What is it now? Speak quickly.",
+  artist: "Can't you see I'm working? What do you want?",
+};
+
   useEffect(() => {
+    if (messages.length === 0) {
+      const greeting = INITIAL_GREETINGS[npcId] || "Hello.";
+      setMessages([{ role: "npc", content: greeting }]);
+      
+      const audioUrl = `/dialogue/tts?text=${encodeURIComponent(greeting)}&npc_id=${npcId}`;
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.play().catch(e => console.error("Audio playback failed:", e));
+    }
+
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const playNpcAudio = (text: string, id: string) => {

@@ -11,6 +11,7 @@ import { HUD } from "./components/HUD";
 import { GameOverScreen } from "./components/GameOverScreen";
 import { IntroDialogue } from "./components/IntroDialogue";
 import { TitleScreen } from "./components/TitleScreen";
+import bgMusicSrc from "./assets/background_music.mp3";
 import {
   DAY_DURATION_MS,
   MAX_ARREST_ATTEMPTS,
@@ -64,6 +65,47 @@ export default function App() {
 
   const [showDevQuest, setShowDevQuest] = useState(false);
   const [devQuestData, setDevQuestData] = useState<any>(null);
+  
+  // Background music setup
+  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Start background music once when app starts
+    const bgAudio = new Audio(bgMusicSrc);
+    bgAudio.volume = 0.15;
+    bgAudio.loop = true;
+    bgAudioRef.current = bgAudio;
+    
+    // Autoplay may be blocked by browser until first interaction.
+    // That's generally fine for a web game, but we can attempt to start it immediately.
+    bgAudio.play()
+      .catch(e => console.error("BG Music play blocked by browser:", e));
+
+    return () => {
+      bgAudio.pause();
+    };
+  }, []);
+
+  // Set up an interaction listener on the window to ensure audio plays 
+  // if browser policy blocked the autoplay above
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      if (bgAudioRef.current && bgAudioRef.current.paused) {
+        bgAudioRef.current.play()
+          .catch(() => {});
+      }
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+
+    window.addEventListener('click', handleFirstInteraction);
+    window.addEventListener('keydown', handleFirstInteraction);
+
+    return () => {
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
 
   useEffect(() => {
     modelVariantRef.current.variant = modelVariant;
