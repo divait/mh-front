@@ -34,6 +34,7 @@ export interface Zone {
   icon: string;
   category: ZoneCategory;
   greeting?: string;
+  buildingType?: "cabaret" | "house" | "house2" | "prefecture" | "boulangerie" | "guard_post" | "tavern" | "atelier";
 }
 
 export interface WallRect {
@@ -48,7 +49,4 @@ export interface PendingInteraction {
   targetY: number;
   event: ZoneClickedEvent;
   indicator: Phaser.GameObjects.Graphics;
-  useEnterAnimation: boolean;
-  exteriorImg?: Phaser.GameObjects.Image;
-  interior?: Phaser.GameObjects.Container;
 }

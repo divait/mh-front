@@ -1,9 +1,16 @@
 import Phaser from "phaser";
-import { Zone, ZoneClickedEvent, WallRect, PendingInteraction } from "./types";
+import { Zone, ZoneClickedEvent, WallRect, PendingInteraction, ZoneId } from "./types";
 import {
   TILE_URL,
   GRASS_URL,
+  ATELIER_URL,
+  BOULANGERIE_URL,
   CABARET_URL,
+  GUARD_POST_URL,
+  HOUSE_URL,
+  HOUSE2_URL,
+  PREFECTURE_URL,
+  TAVERN_URL,
   BAKER_FRAMES,
   TAVERN_KEEPER_FRAMES,
   GUARD_FRAMES,
@@ -22,14 +29,22 @@ import {
   CELL_W,
   CELL_H,
   TALK_RADIUS,
-  WALL_THICKNESS,
-  DOOR_WIDTH,
   CHAR_SCALE,
 } from "./constants";
 import { ZONES } from "./zones";
 import { buildWalls, overlaps } from "./walls";
 
 export { MAP_WIDTH, MAP_HEIGHT };
+
+export interface BuildingData {
+  zoneId: string;
+  exteriorImg: Phaser.GameObjects.Image;
+  exteriorDoor: Phaser.GameObjects.Graphics;
+  interior: Phaser.GameObjects.Container;
+  interiorBounds: { ix: number; iy: number; iw: number; ih: number };
+  npcContainer?: Phaser.GameObjects.Container;
+  entryRect: { x: number; y: number; w: number; h: number };
+}
 
 export class ParisScene extends Phaser.Scene {
   private onZoneClicked!: (event: ZoneClickedEvent) => void;
@@ -46,19 +61,11 @@ export class ParisScene extends Phaser.Scene {
   private indicatorTween: Phaser.Tweens.Tween | null = null;
   private dayNightOverlay!: Phaser.GameObjects.Rectangle;
   private titleText!: Phaser.GameObjects.Text;
-  private cabaretExteriorImg: Phaser.GameObjects.Image | null = null;
-  private cabaretInterior: Phaser.GameObjects.Container | null = null;
-  /** World rect of the cabaret interior (80% zone), for walls and door. */
-  private cabaretInteriorBounds: {
-    ix: number;
-    iy: number;
-    iw: number;
-    ih: number;
-  } | null = null;
-  /** When true, interior walls are in this.walls and exit is only via door. */
-  private insideCabaret = false;
-  /** Wall rects added when entering the cabaret; removed on exit. */
-  private cabaretInteriorWalls: WallRect[] = [];
+  
+  private buildings: BuildingData[] = [];
+  private activeBuilding: BuildingData | null = null;
+  /** Wall rects added when entering a building; removed on exit. */
+  private activeInteriorWalls: WallRect[] = [];
   private isTransitioning = false;
   private keyE!: Phaser.Input.Keyboard.Key;
 
@@ -148,7 +155,14 @@ export class ParisScene extends Phaser.Scene {
   preload() {
     this.load.image("tile", TILE_URL);
     this.load.image("grass", GRASS_URL);
-    this.load.image("cabaret_building", CABARET_URL);
+    this.load.image("atelier", ATELIER_URL);
+    this.load.image("boulangerie", BOULANGERIE_URL);
+    this.load.image("cabaret", CABARET_URL);
+    this.load.image("guard_post", GUARD_POST_URL);
+    this.load.image("house", HOUSE_URL);
+    this.load.image("house2", HOUSE2_URL);
+    this.load.image("prefecture", PREFECTURE_URL);
+    this.load.image("tavern", TAVERN_URL);
     BAKER_FRAMES.forEach((url, i) => {
       this.load.image(`baker_idle_${i}`, url);
     });
@@ -325,19 +339,6 @@ export class ParisScene extends Phaser.Scene {
     this.cameras.main.centerOn(this.player.x, this.player.y);
   }
 
-  private drawWalls(wallRects: WallRect[]) {
-    const g = this.add.graphics();
-    g.fillStyle(0x1a1208, 1);
-    for (const w of wallRects) {
-      g.fillRect(w.x, w.y, w.w, w.h);
-    }
-    // Door indicator: a lighter strip in the gap on the bottom wall
-    // (visual only — the gap in the wall rects IS the door)
-    g.fillStyle(0x5a4a28, 0.6);
-    // We can't easily know which side the door is here, so just a subtle floor mark
-    // is handled by the absence of wall fill in that gap.
-  }
-
   private createDecorativeZones() {
     const decorGraphics = this.add.graphics();
 
@@ -347,40 +348,31 @@ export class ParisScene extends Phaser.Scene {
       row: number,
       colSpan = 1,
       rowSpan = 1,
-      label = "House",
+      label = "Maison de Ville",
     ) => {
       const x = col * CELL_W + 60;
       const y = row * CELL_H + 60;
       const w = CELL_W * colSpan - 120;
       const h = CELL_H * rowSpan - 120;
 
-      // Fill
-      decorGraphics.fillStyle(0x3a2a1a, 1);
-      decorGraphics.fillRect(x, y, w, h);
+      // We alternate between house and house2 for visual variety
+      const bType = (col + row) % 2 === 0 ? "house" : "house2";
 
-      // Register and draw walls
-      const houseWalls = buildWalls(x, y, w, h, "bottom");
-      this.walls.push(...houseWalls);
-      this.drawWalls(houseWalls);
-
-      // Door highlight (warm strip at the gap)
-      const doorG = this.add.graphics();
-      doorG.fillStyle(0x6a5028, 1);
-      const mid = x + w / 2;
-      doorG.fillRect(
-        mid - DOOR_WIDTH / 2,
-        y + h - WALL_THICKNESS,
-        DOOR_WIDTH,
-        WALL_THICKNESS,
-      );
-
-      this.add
-        .text(x + w / 2, y + h / 2, label, {
-          fontSize: "14px",
-          color: "#6a5a30",
-          fontFamily: "Georgia, serif",
-        })
-        .setOrigin(0.5);
+      this.createZone({
+        id: `decor_house_${col}_${row}` as ZoneId,
+        label,
+        npcName: "", // Empty so no NPC renders
+        category: "belle_epoque",
+        icon: "",
+        x: x,
+        y: y,
+        width: w,
+        height: h,
+        color: 0x3a2a1a,
+        hoverColor: 0x4a3a2a,
+        borderColor: 0x6a5a30,
+        buildingType: bType,
+      });
     };
 
     // Helper to draw a "Park" — no walls, fully walkable
@@ -441,16 +433,11 @@ export class ParisScene extends Phaser.Scene {
 
       if (dist <= 8) {
         // Arrived — fire dialogue and clean up
-        const { useEnterAnimation, exteriorImg, interior } = this.pendingInteraction;
         this.pendingInteraction = null;
         this.indicatorTween?.stop();
         this.indicatorTween = null;
         indicator.destroy();
-        if (useEnterAnimation && exteriorImg && interior) {
-          this.playEnterBuildingAnimation(event, exteriorImg, interior);
-        } else {
-          this.onZoneClicked(event);
-        }
+        this.onZoneClicked(event);
       } else {
         // Move toward target (bypass wall collision so player doesn't get stuck)
         const speed = PLAYER_SPEED * dt;
@@ -500,14 +487,28 @@ export class ParisScene extends Phaser.Scene {
       return;
     }
 
-    // When inside the cabaret, only exit via the door (E key near door)
-    if (
-      this.insideCabaret &&
-      this.cabaretExteriorImg &&
-      this.cabaretInterior &&
-      this.cabaretInteriorBounds
-    ) {
-      const b = this.cabaretInteriorBounds;
+    // Auto-enter by walking through exterior door
+    if (!this.activeBuilding) {
+      for (const b of this.buildings) {
+        if (!b.exteriorImg.visible) continue;
+        
+        const { x: bx, y: by, w: bw, h: bh } = b.entryRect;
+        
+        if (
+          this.player.x > bx + bw / 2 - 40 &&
+          this.player.x < bx + bw / 2 + 40 &&
+          this.player.y < by + bh &&
+          this.player.y > by + bh - 20
+        ) {
+          this.playEnterBuildingAnimation(b);
+          return;
+        }
+      }
+    }
+
+    // When inside a building, only exit via the door (E key near door)
+    if (this.activeBuilding) {
+      const b = this.activeBuilding.interiorBounds;
       const doorX = b.ix + b.iw / 2;
       const doorY = b.iy + b.ih - 25;
       const distToDoor = Phaser.Math.Distance.Between(
@@ -522,7 +523,7 @@ export class ParisScene extends Phaser.Scene {
       const walkedOut = this.player.y > b.iy + b.ih - 18;
 
       if (walkedOut || (distToDoor < 50 && Phaser.Input.Keyboard.JustDown(this.keyE))) {
-        this.playExitBuildingAnimation(this.cabaretExteriorImg, this.cabaretInterior);
+        this.playExitBuildingAnimation(this.activeBuilding);
         return;
       }
     }
@@ -614,11 +615,7 @@ export class ParisScene extends Phaser.Scene {
    * zone event. On the black frame, swaps the exterior image for the interior
    * container so the fade-in reveals the inside of the building.
    */
-  private playEnterBuildingAnimation(
-    event: ZoneClickedEvent,
-    exteriorImg: Phaser.GameObjects.Image,
-    interior: Phaser.GameObjects.Container,
-  ) {
+  private playEnterBuildingAnimation(building: BuildingData) {
     this.isTransitioning = true;
     const cam = this.cameras.main;
     cam.zoomTo(2.2, 400, "Sine.easeIn");
@@ -632,18 +629,23 @@ export class ParisScene extends Phaser.Scene {
         (_cam: Phaser.Cameras.Scene2D.Camera, progress: number) => {
           if (progress === 1) {
             // Swap exterior → interior while screen is black
-            exteriorImg.setVisible(false);
-            interior.setVisible(true);
-            this.children.bringToTop(interior);
+            building.exteriorImg.setVisible(false);
+            if (building.exteriorDoor) building.exteriorDoor.setVisible(false);
+            building.interior.setVisible(true);
+            this.children.bringToTop(building.interior);
+            if (building.npcContainer) {
+              building.npcContainer.setVisible(true);
+              this.children.bringToTop(building.npcContainer);
+            }
             this.children.bringToTop(this.player);
 
             // Add interior walls so the player is confined and can only leave via the door
-            const bounds = this.cabaretInteriorBounds;
+            const bounds = building.interiorBounds;
             if (bounds) {
               const { ix, iy, iw, ih } = bounds;
-              this.cabaretInteriorWalls = buildWalls(ix, iy, iw, ih, "bottom");
-              this.walls.push(...this.cabaretInteriorWalls);
-              this.insideCabaret = true;
+              this.activeInteriorWalls = buildWalls(ix, iy, iw, ih, "bottom");
+              this.walls.push(...this.activeInteriorWalls);
+              this.activeBuilding = building;
               // Place player just inside the room (center, above the door)
               this.player.setPosition(ix + iw / 2, iy + ih - 50);
             }
@@ -651,7 +653,6 @@ export class ParisScene extends Phaser.Scene {
             cam.zoomTo(1.4, 0);
             cam.fadeIn(250, 0, 0, 0);
             this.isTransitioning = false;
-            this.onZoneClicked(event);
           }
         },
       );
@@ -662,26 +663,25 @@ export class ParisScene extends Phaser.Scene {
    * Play the inverse of the enter animation: fade to black, hide interior and
    * show exterior, remove interior walls, place player outside the door, fade in.
    */
-  private playExitBuildingAnimation(
-    exteriorImg: Phaser.GameObjects.Image,
-    interior: Phaser.GameObjects.Container,
-  ) {
+  private playExitBuildingAnimation(building: BuildingData) {
     this.isTransitioning = true;
     const cam = this.cameras.main;
     
     // Fade to black
     cam.fade(300, 0, 0, 0, false, (_cam: Phaser.Cameras.Scene2D.Camera, progress: number) => {
       if (progress === 1) {
-        interior.setVisible(false);
-        exteriorImg.setVisible(true);
+        building.interior.setVisible(false);
+        building.exteriorImg.setVisible(true);
+        if (building.exteriorDoor) building.exteriorDoor.setVisible(true);
+        if (building.npcContainer) building.npcContainer.setVisible(false);
 
         // Remove interior walls and clear state
-        this.walls = this.walls.filter((w) => !this.cabaretInteriorWalls.includes(w));
-        this.cabaretInteriorWalls = [];
-        this.insideCabaret = false;
+        this.walls = this.walls.filter((w) => !this.activeInteriorWalls.includes(w));
+        this.activeInteriorWalls = [];
+        this.activeBuilding = null;
 
         // Place player just outside the door (bottom center of interior)
-        const b = this.cabaretInteriorBounds!;
+        const b = building.interiorBounds;
         this.player.setPosition(b.ix + b.iw / 2, b.iy + b.ih + 35);
 
         // Ensure player is rendered above the building exterior
@@ -725,28 +725,12 @@ export class ParisScene extends Phaser.Scene {
   }
 
   private createZone(zone: Zone) {
-    const isCabaret = zone.id === "cabaret_dancer";
-
-    // Register walls for this building (skip person NPCs and cabaret — the
-    // cabaret uses a pixel-art image so no separate wall geometry is needed)
-    if (zone.category !== "person" && !isCabaret) {
-      const zoneWalls = buildWalls(
-        zone.x,
-        zone.y,
-        zone.width,
-        zone.height,
-        "bottom",
-      );
-      this.walls.push(...zoneWalls);
-      this.drawWalls(zoneWalls);
-    }
+    const hasBuilding = !!zone.buildingType;
+    const isPerson = zone.category === "person";
 
     // Solid collision box around the NPC sprite so the player cannot walk through them
     const npcWorldCX = zone.x + zone.width / 2;
-    const npcWorldCY =
-      zone.category === "person"
-        ? zone.y + zone.height / 2
-        : zone.y + zone.height / 2 - 10;
+    const npcWorldCY = isPerson ? zone.y + zone.height / 2 : zone.y + zone.height / 2 - 10;
     const npcBlockW = 0;
     const npcBlockH = 30;
     this.walls.push({
@@ -758,49 +742,80 @@ export class ParisScene extends Phaser.Scene {
 
     const container = this.add.container(zone.x, zone.y);
 
-    // For the cabaret use the real building image; all others use a coloured rectangle
     let bgRect: Phaser.GameObjects.Rectangle | null = null;
     let bgImg: Phaser.GameObjects.Image | null = null;
-    if (isCabaret) {
-      bgImg = this.add.image(
-        zone.width / 2,
-        zone.height / 2,
-        "cabaret_building",
-      );
-      // Scale the image to fill the zone exactly
+    let bData: BuildingData | null = null;
+
+    if (hasBuilding) {
+      const bType = zone.buildingType!;
+      let hitBox = { bx: zone.x, by: zone.y, bw: zone.width, bh: zone.height };
+      
+      if (bType === "cabaret") {
+        hitBox = {
+          bx: zone.x + zone.width * (6 / 64),
+          by: zone.y + zone.height * (2 / 64),
+          bw: zone.width * (52 / 64),
+          bh: zone.height * (60 / 64),
+        };
+      } else if (bType === "house") {
+        hitBox = {
+          bx: zone.x + zone.width * (17 / 64),
+          by: zone.y + zone.height * (1 / 64),
+          bw: zone.width * (30 / 64),
+          bh: zone.height * (62 / 64),
+        };
+      } else if (bType === "house2") {
+        hitBox = {
+          bx: zone.x + zone.width * (18 / 64),
+          by: zone.y + zone.height * (5 / 64),
+          bw: zone.width * (28 / 64),
+          bh: zone.height * (59 / 64),
+        };
+      } else if (bType === "prefecture") {
+        hitBox = {
+          bx: zone.x,
+          by: zone.y + zone.height * (11 / 64),
+          bw: zone.width,
+          bh: zone.height * (46 / 64),
+        };
+      } else if (bType === "boulangerie") {
+        hitBox = {
+          bx: zone.x + zone.width * (14 / 64),
+          by: zone.y + zone.height * (0 / 64),
+          bw: zone.width * (36 / 64),
+          bh: zone.height * (64 / 64),
+        };
+      } else if (bType === "guard_post") {
+        hitBox = {
+          bx: zone.x + zone.width * (8 / 64),
+          by: zone.y + zone.height * (2 / 64),
+          bw: zone.width * (48 / 64),
+          bh: zone.height * (61 / 64),
+        };
+      } else if (bType === "tavern") {
+        hitBox = {
+          bx: zone.x + zone.width * (6 / 64),
+          by: zone.y + zone.height * (3 / 64),
+          bw: zone.width * (51 / 64),
+          bh: zone.height * (58 / 64),
+        };
+      } else if (bType === "atelier") {
+        hitBox = {
+          bx: zone.x + zone.width * (12 / 64),
+          by: zone.y + zone.height * (1 / 64),
+          bw: zone.width * (40 / 64),
+          bh: zone.height * (63 / 64),
+        };
+      }
+
+      const zoneWalls = buildWalls(hitBox.bx, hitBox.by, hitBox.bw, hitBox.bh, "bottom");
+      this.walls.push(...zoneWalls);
+
+      bgImg = this.add.image(zone.width / 2, zone.height / 2, bType);
       bgImg.setDisplaySize(zone.width, zone.height);
-    } else {
-      bgRect = this.add
-        .rectangle(
-          zone.width / 2,
-          zone.height / 2,
-          zone.width,
-          zone.height,
-          zone.color,
-        )
-        .setStrokeStyle(2, zone.borderColor);
-    }
-
-    // Building label — skip for cabaret (the image already shows the name)
-    if (!isCabaret && bgRect) {
-      const label = this.add
-        .text(zone.width / 2, 24, zone.label, {
-          fontSize: "12px",
-          color: "#f0e6c8",
-          fontFamily: "Georgia, serif",
-          wordWrap: { width: zone.width - 16 },
-          align: "center",
-        })
-        .setOrigin(0.5, 0);
-      container.add([bgRect, label]);
-    } else if (bgImg) {
       container.add([bgImg]);
-    }
 
-    // Interior room — hidden until the player enters the cabaret.
-    // Sized at 80% of the zone, centred on the same world position.
-    if (isCabaret) {
-      const iw = zone.width * 0.8;
+      const iw = zone.width * 0.6;
       const ih = zone.height * 0.8;
       const ix = zone.x + (zone.width - iw) / 2;
       const iy = zone.y + (zone.height - ih) / 2;
@@ -811,21 +826,12 @@ export class ParisScene extends Phaser.Scene {
         .rectangle(iw / 2, ih / 2, iw, ih, 0x2a1a0e)
         .setStrokeStyle(3, zone.borderColor);
 
-      // Warm ambient light strip along the top (stage lighting feel)
       const stageLight = this.add.graphics();
       stageLight.fillStyle(0x6b2c4a, 0.6);
       stageLight.fillRect(0, 0, iw, ih * 0.18);
 
-      // Stage platform at the bottom third
-      const stage = this.add.graphics();
-      stage.fillStyle(0x5a3a1a, 1);
-      stage.fillRect(iw * 0.1, ih * 0.6, iw * 0.8, ih * 0.08);
-      stage.lineStyle(1, 0xd4af37, 0.7);
-      stage.strokeRect(iw * 0.1, ih * 0.6, iw * 0.8, ih * 0.08);
-
-      // Interior label
       const interiorLabel = this.add
-        .text(iw / 2, 14, "Le Moulin Rouge", {
+        .text(iw / 2, 14, zone.label, {
           fontSize: "11px",
           color: "#d4af37",
           fontFamily: "Georgia, serif",
@@ -833,44 +839,58 @@ export class ParisScene extends Phaser.Scene {
         })
         .setOrigin(0.5, 0);
 
-      // Exit Door Area (bottom center)
       const doorG = this.add.graphics();
       const interiorDoorWidth = 60;
       const interiorDoorHeight = 10;
       const doorX = iw / 2 - interiorDoorWidth / 2;
       const doorY = ih - interiorDoorHeight + 8;
-      // Darker, subtle floor shadow for the exit
       doorG.fillStyle(0x1a1208, 0.7);
       doorG.fillRect(doorX, doorY, interiorDoorWidth, interiorDoorHeight);
-      // Bolder, defined border
       doorG.lineStyle(2, 0x1a1208, 1);
       doorG.strokeRect(doorX, doorY, interiorDoorWidth, interiorDoorHeight);
       
-      interiorContainer.add([floor, stageLight, stage, interiorLabel, doorG]);
+      interiorContainer.add([floor, stageLight, interiorLabel, doorG]);
       interiorContainer.setVisible(false);
 
-      this.cabaretExteriorImg = bgImg;
-      this.cabaretInterior = interiorContainer;
-      this.cabaretInteriorBounds = { ix, iy, iw, ih };
+      const exteriorDoorG = this.add.graphics();
+      const extDoorWidth = 60;
+      const extDoorHeight = 10;
+      const extDoorX = hitBox.bx + hitBox.bw / 2 - extDoorWidth / 2;
+      const extDoorY = hitBox.by + hitBox.bh - extDoorHeight / 2;
+      
+      exteriorDoorG.fillStyle(0x1a1208, 0.7);
+      exteriorDoorG.fillRect(extDoorX, extDoorY, extDoorWidth, extDoorHeight);
+      exteriorDoorG.lineStyle(2, 0x1a1208, 1);
+      exteriorDoorG.strokeRect(extDoorX, extDoorY, extDoorWidth, extDoorHeight);
+      container.add([exteriorDoorG]);
+
+      bData = {
+        zoneId: zone.id,
+        exteriorImg: bgImg,
+        exteriorDoor: exteriorDoorG,
+        interior: interiorContainer,
+        interiorBounds: { ix, iy, iw, ih },
+        entryRect: { x: hitBox.bx, y: hitBox.by, w: hitBox.bw, h: hitBox.bh },
+      };
+      this.buildings.push(bData);
+    } else {
+      bgRect = this.add
+        .rectangle(zone.width / 2, zone.height / 2, zone.width, zone.height, zone.color)
+        .setStrokeStyle(2, zone.borderColor);
+      
+      const label = this.add
+        .text(zone.width / 2, 24, zone.label, {
+          fontSize: "12px",
+          color: "#f0e6c8",
+          fontFamily: "Georgia, serif",
+          wordWrap: { width: zone.width - 16 },
+          align: "center",
+        })
+        .setOrigin(0.5, 0);
+      container.add([bgRect, label]);
     }
 
-    // Door — drawn on top of the building fill, inside the container (local coords)
-    // Skip for cabaret: the door is part of the building image
-    if (zone.category !== "person" && !isCabaret) {
-      const doorG = this.add.graphics();
-      const doorX = zone.width / 2 - DOOR_WIDTH / 2;
-      const doorY = zone.height - WALL_THICKNESS;
-      doorG.fillStyle(0xc8860a, 1);
-      doorG.fillRect(doorX, doorY, DOOR_WIDTH, WALL_THICKNESS);
-      doorG.lineStyle(2, 0x1a1208, 1);
-      doorG.strokeRect(doorX, doorY, DOOR_WIDTH, WALL_THICKNESS);
-      const doorLabel = this.add
-        .text(zone.width / 2, doorY + WALL_THICKNESS / 2, "🚪", {
-          fontSize: "14px",
-        })
-        .setOrigin(0.5);
-      container.add([doorG, doorLabel]);
-    }
+    // Remove fallback door graphic (all buildings now have exterior door overlay)
 
     // NPC character sprite — centered in the building, interactive
     const NPC_W = zone.category === "person" ? 36 : 44;
@@ -945,7 +965,7 @@ export class ParisScene extends Phaser.Scene {
 
     // NPC name below sprite
     const npcName = this.add
-      .text(npcCX, npcCY + (isSprite ? 40 : NPC_H / 2 + 14), zone.npcName, {
+      .text(npcCX, npcCY + (isSprite ? 35 : NPC_H / 2 + 14), zone.npcName, {
         fontSize: "11px",
         color: zone.category === "person" ? "#aaaaaa" : "#d4af37",
         fontFamily: "Georgia, serif",
@@ -966,7 +986,15 @@ export class ParisScene extends Phaser.Scene {
       hitArea,
     ];
     if (npcIcon) visualItems.splice(1, 0, npcIcon);
-    container.add(visualItems);
+    
+    // Draw independently of exterior building to allow z-depth sorting
+    const npcContainer = this.add.container(zone.x, zone.y);
+    npcContainer.add(visualItems);
+
+    if (bData) {
+      npcContainer.setVisible(false);
+      bData.npcContainer = npcContainer;
+    }
 
     hitArea.on("pointerover", () => {
       if (!isSprite) {
@@ -1002,6 +1030,8 @@ export class ParisScene extends Phaser.Scene {
     });
 
     hitArea.on("pointerdown", () => {
+      if (bData && this.activeBuilding?.zoneId !== zone.id) return;
+
       const clickEvent: ZoneClickedEvent = {
         npcId: zone.id,
         npcName: zone.npcName,
@@ -1021,16 +1051,8 @@ export class ParisScene extends Phaser.Scene {
 
       // Check proximity to stand point
       if (this.isNearNPC(stand.x, stand.y)) {
-        if (isCabaret && this.cabaretExteriorImg && this.cabaretInterior) {
-          this.playEnterBuildingAnimation(
-            clickEvent,
-            this.cabaretExteriorImg,
-            this.cabaretInterior,
-          );
-        } else {
-          this.cameras.main.shake(200, 0.005);
-          this.onZoneClicked(clickEvent);
-        }
+        this.cameras.main.shake(200, 0.005);
+        this.onZoneClicked(clickEvent);
       } else {
         // Auto-walk directly to the NPC stand point (bypasses wall collision)
         const indicator = this.createDestinationIndicator(stand.x, stand.y);
@@ -1044,9 +1066,6 @@ export class ParisScene extends Phaser.Scene {
           targetY: stand.y,
           event: clickEvent,
           indicator,
-          useEnterAnimation: isCabaret,
-          exteriorImg: isCabaret ? this.cabaretExteriorImg ?? undefined : undefined,
-          interior: isCabaret ? this.cabaretInterior ?? undefined : undefined,
         };
       }
     });

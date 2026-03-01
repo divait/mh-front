@@ -1,6 +1,13 @@
 export const TILE_URL = new URL("../assets/tile.png", import.meta.url).href;
 export const GRASS_URL = new URL("../assets/grass.png", import.meta.url).href;
+export const ATELIER_URL = new URL("../assets/buildings/atelier.png", import.meta.url).href;
+export const BOULANGERIE_URL = new URL("../assets/buildings/boulangerie.png", import.meta.url).href;
 export const CABARET_URL = new URL("../assets/buildings/cabaret.png", import.meta.url).href;
+export const GUARD_POST_URL = new URL("../assets/buildings/guard_post.png", import.meta.url).href;
+export const HOUSE_URL = new URL("../assets/buildings/house.png", import.meta.url).href;
+export const HOUSE2_URL = new URL("../assets/buildings/house2.png", import.meta.url).href;
+export const PREFECTURE_URL = new URL("../assets/buildings/prefecture.png", import.meta.url).href;
+export const TAVERN_URL = new URL("../assets/buildings/tavern.png", import.meta.url).href;
 
 export const BAKER_FRAMES: string[] = [
   new URL("../assets/baker/idle/frame_000.png", import.meta.url).href,

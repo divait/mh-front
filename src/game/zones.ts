@@ -16,6 +16,7 @@ export const ZONES: Zone[] = [
     borderColor: 0x4a6fa5,
     icon: "🍞",
     category: "original",
+    buildingType: "boulangerie",
   },
   // Row 0, Col 1: House
   // Row 0, Col 2: House
@@ -32,6 +33,7 @@ export const ZONES: Zone[] = [
     borderColor: 0x4a6fa5,
     icon: "⚔️",
     category: "original",
+    buildingType: "guard_post",
   },
   {
     id: "tavern_keeper",
@@ -46,6 +48,7 @@ export const ZONES: Zone[] = [
     borderColor: 0x4a6fa5,
     icon: "🍷",
     category: "original",
+    buildingType: "tavern",
   },
 
   // ROW 1
@@ -69,6 +72,7 @@ export const ZONES: Zone[] = [
     borderColor: 0xd4af37,
     icon: "💃",
     category: "belle_epoque",
+    buildingType: "cabaret",
   },
   // Row 2, Col 3: House (Vertical start)
   // Row 2, Col 4: House
@@ -88,6 +92,7 @@ export const ZONES: Zone[] = [
     borderColor: 0xd4af37,
     icon: "🔍",
     category: "belle_epoque",
+    buildingType: "prefecture",
   },
   // Row 3, Col 3: House (Vertical end)
   {
@@ -103,6 +108,7 @@ export const ZONES: Zone[] = [
     borderColor: 0xd4af37,
     icon: "🎨",
     category: "belle_epoque",
+    buildingType: "atelier",
   },
 
   // Person NPCs sprinkled in streets/parks
