@@ -68,6 +68,7 @@ export class ParisScene extends Phaser.Scene {
   /** Wall rects added when entering a building; removed on exit. */
   private activeInteriorWalls: WallRect[] = [];
   private isTransitioning = false;
+  private isCinematic = false;
   private keyE!: Phaser.Input.Keyboard.Key;
 
   constructor() {
@@ -131,23 +132,75 @@ export class ParisScene extends Phaser.Scene {
 
   /**
    * Pan and zoom the camera from the city overview to the inspector zone,
-   * then re-attach camera follow to the player and call onComplete.
+   * then re-attach camera follow to the player, auto-walk them to the inspector,
+   * and call onComplete to trigger the intro dialogue.
    */
   panToInspector(onComplete: () => void) {
+    this.isCinematic = true;
     const inspectorZone = ZONES.find((z) => z.id === "inspector")!;
-    const targetX = inspectorZone.x + inspectorZone.width / 2;
-    const targetY = inspectorZone.y + inspectorZone.height / 2;
+    const cam = this.cameras.main;
 
-    this.cameras.main.pan(targetX, targetY, 2200, "Sine.easeInOut");
-    this.cameras.main.zoomTo(
+    cam.pan(this.player.x, this.player.y, 2200, "Sine.easeInOut");
+    cam.zoomTo(
       1.4,
       2200,
       "Sine.easeInOut",
       false,
       (_cam, progress) => {
         if (progress === 1) {
-          this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-          onComplete();
+          cam.startFollow(this.player, true, 0.1, 0.1);
+          
+          const prefectureBuilding = this.buildings.find(b => b.zoneId === "inspector");
+          if (!prefectureBuilding) {
+            onComplete();
+            return;
+          }
+
+          const { x: bx, y: by, w: bw, h: bh } = prefectureBuilding.entryRect;
+          const doorX = bx + bw / 2;
+          const doorY = by + bh;
+
+          this.tweens.add({
+            targets: this.player,
+            x: doorX,
+            y: doorY - 10,
+            duration: 2000,
+            onStart: () => {
+              if (Math.abs(doorX - this.player.x) > Math.abs(doorY - this.player.y)) {
+                this.player.play("main_walk");
+                this.player.setFlipX(doorX < this.player.x);
+              } else {
+                this.player.play(doorY < this.player.y ? "main_walk_up" : "main_walk_down");
+              }
+            },
+            onComplete: () => {
+              this.player.play("main_idle");
+              
+              this.playEnterBuildingAnimation(prefectureBuilding, () => {
+                const standPoint = this.getNPCStandPoint(inspectorZone);
+                
+                this.tweens.add({
+                  targets: this.player,
+                  x: standPoint.x,
+                  y: standPoint.y,
+                  duration: 1500,
+                  onStart: () => {
+                    if (Math.abs(standPoint.x - this.player.x) > Math.abs(standPoint.y - this.player.y)) {
+                      this.player.play("main_walk");
+                      this.player.setFlipX(standPoint.x < this.player.x);
+                    } else {
+                      this.player.play(standPoint.y < this.player.y ? "main_walk_up" : "main_walk_down");
+                    }
+                  },
+                  onComplete: () => {
+                    this.player.play("main_idle");
+                    this.isCinematic = false;
+                    onComplete();
+                  }
+                });
+              });
+            }
+          });
         }
       },
     );
@@ -330,10 +383,12 @@ export class ParisScene extends Phaser.Scene {
     // Build decorative "House" and "Park" zones based on reference grid
     this.createDecorativeZones();
 
-    // Player — spawn in the street just below the Préfecture, clear of all walls/NPCs
+    // Player — spawn in the street just below the Préfecture, clear of all walls
     const inspectorZone = ZONES.find((z) => z.id === "inspector")!;
-    const spawnX = inspectorZone.x + inspectorZone.width / 2 + 50;
-    const spawnY = inspectorZone.y + inspectorZone.height + 40;
+    const spawnX = inspectorZone.x + inspectorZone.width / 2;
+    // Spawn safely in the street between ROW 1 (740) and ROW 2 (~848)
+    const spawnY = 790;
+    
     this.player = this.add.sprite(spawnX, spawnY, "main_idle_0");
     this.player.setScale(CHAR_SCALE);
     this.player.setDepth(10);
@@ -423,6 +478,8 @@ export class ParisScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number) {
+    if (this.isCinematic) return;
+
     const dt = delta / 1000;
     const hw = PLAYER_WIDTH / 2;
     const hh = PLAYER_HEIGHT / 2;
@@ -618,7 +675,7 @@ export class ParisScene extends Phaser.Scene {
    * zone event. On the black frame, swaps the exterior image for the interior
    * container so the fade-in reveals the inside of the building.
    */
-  private playEnterBuildingAnimation(building: BuildingData) {
+  private playEnterBuildingAnimation(building: BuildingData, onComplete?: () => void) {
     this.isTransitioning = true;
     const cam = this.cameras.main;
     cam.zoomTo(2.2, 400, "Sine.easeIn");
@@ -654,8 +711,12 @@ export class ParisScene extends Phaser.Scene {
             }
 
             cam.zoomTo(1.4, 0);
-            cam.fadeIn(250, 0, 0, 0);
-            this.isTransitioning = false;
+            cam.fadeIn(250, 0, 0, 0, (_c: Phaser.Cameras.Scene2D.Camera, p: number) => {
+              if (p === 1) {
+                this.isTransitioning = false;
+                if (onComplete) onComplete();
+              }
+            });
           }
         },
       );
