@@ -59,6 +59,7 @@ export class ParisScene extends Phaser.Scene {
   private insideCabaret = false;
   /** Wall rects added when entering the cabaret; removed on exit. */
   private cabaretInteriorWalls: WallRect[] = [];
+  private isTransitioning = false;
   private keyE!: Phaser.Input.Keyboard.Key;
 
   constructor() {
@@ -494,6 +495,11 @@ export class ParisScene extends Phaser.Scene {
       return;
     }
 
+    if (this.isTransitioning) {
+      this.player.play("main_idle", true);
+      return;
+    }
+
     // When inside the cabaret, only exit via the door (E key near door)
     if (
       this.insideCabaret &&
@@ -510,7 +516,12 @@ export class ParisScene extends Phaser.Scene {
         doorX,
         doorY,
       );
-      if (distToDoor < 50 && Phaser.Input.Keyboard.JustDown(this.keyE)) {
+
+      // Auto-exit if the player walks out through the door (Y exceeds the interior floor bounds near the door)
+      // or if they press E near the door.
+      const walkedOut = this.player.y > b.iy + b.ih - 18;
+
+      if (walkedOut || (distToDoor < 50 && Phaser.Input.Keyboard.JustDown(this.keyE))) {
         this.playExitBuildingAnimation(this.cabaretExteriorImg, this.cabaretInterior);
         return;
       }
@@ -608,6 +619,7 @@ export class ParisScene extends Phaser.Scene {
     exteriorImg: Phaser.GameObjects.Image,
     interior: Phaser.GameObjects.Container,
   ) {
+    this.isTransitioning = true;
     const cam = this.cameras.main;
     cam.zoomTo(2.2, 400, "Sine.easeIn");
     this.time.delayedCall(350, () => {
@@ -638,6 +650,7 @@ export class ParisScene extends Phaser.Scene {
 
             cam.zoomTo(1.4, 0);
             cam.fadeIn(250, 0, 0, 0);
+            this.isTransitioning = false;
             this.onZoneClicked(event);
           }
         },
@@ -653,7 +666,10 @@ export class ParisScene extends Phaser.Scene {
     exteriorImg: Phaser.GameObjects.Image,
     interior: Phaser.GameObjects.Container,
   ) {
+    this.isTransitioning = true;
     const cam = this.cameras.main;
+    
+    // Fade to black
     cam.fade(300, 0, 0, 0, false, (_cam: Phaser.Cameras.Scene2D.Camera, progress: number) => {
       if (progress === 1) {
         interior.setVisible(false);
@@ -668,7 +684,15 @@ export class ParisScene extends Phaser.Scene {
         const b = this.cabaretInteriorBounds!;
         this.player.setPosition(b.ix + b.iw / 2, b.iy + b.ih + 35);
 
+        // Ensure player is rendered above the building exterior
+        this.children.bringToTop(this.player);
+
+        // Reverse the entrance zoom effect
+        cam.setZoom(2.2);
         cam.fadeIn(250, 0, 0, 0);
+        cam.zoomTo(1.4, 400, "Sine.easeOut");
+
+        this.isTransitioning = false;
       }
     });
   }
@@ -809,7 +833,20 @@ export class ParisScene extends Phaser.Scene {
         })
         .setOrigin(0.5, 0);
 
-      interiorContainer.add([floor, stageLight, stage, interiorLabel]);
+      // Exit Door Area (bottom center)
+      const doorG = this.add.graphics();
+      const interiorDoorWidth = 60;
+      const interiorDoorHeight = 10;
+      const doorX = iw / 2 - interiorDoorWidth / 2;
+      const doorY = ih - interiorDoorHeight + 8;
+      // Darker, subtle floor shadow for the exit
+      doorG.fillStyle(0x1a1208, 0.7);
+      doorG.fillRect(doorX, doorY, interiorDoorWidth, interiorDoorHeight);
+      // Bolder, defined border
+      doorG.lineStyle(2, 0x1a1208, 1);
+      doorG.strokeRect(doorX, doorY, interiorDoorWidth, interiorDoorHeight);
+      
+      interiorContainer.add([floor, stageLight, stage, interiorLabel, doorG]);
       interiorContainer.setVisible(false);
 
       this.cabaretExteriorImg = bgImg;
