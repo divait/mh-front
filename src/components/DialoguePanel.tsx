@@ -2,6 +2,13 @@ import { useState, useRef, useEffect, FormEvent } from "react";
 import { MAX_ARREST_ATTEMPTS } from "../game/gameState";
 import type { NpcClues } from "../App";
 
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
 interface Message {
   role: "player" | "npc";
   content: string;
@@ -47,6 +54,68 @@ export function DialoguePanel({
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Web Speech API
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const shouldKeepRecordingRef = useRef(false);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US'; 
+
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(prev => prev ? prev + " " + transcript : transcript);
+      };
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error !== 'no-speech') {
+          shouldKeepRecordingRef.current = false;
+        }
+      };
+      recognition.onend = () => {
+        setIsRecording(false);
+        if (shouldKeepRecordingRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error("Failed to restart recording:", e);
+            shouldKeepRecordingRef.current = false;
+          }
+        }
+      };
+      
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleRecording = () => {
+    if (isRecording || shouldKeepRecordingRef.current) {
+      shouldKeepRecordingRef.current = false;
+      recognitionRef.current?.stop();
+    } else {
+      shouldKeepRecordingRef.current = true;
+      try {
+        recognitionRef.current?.start();
+      } catch (e) {/* already started */}
+    }
+  };
+
+  // Auto-send after 5 seconds of silence if recording
+  useEffect(() => {
+    if (!isRecording || !input.trim()) return;
+    const timer = setTimeout(() => {
+      handleSend(input);
+    }, 5000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input, isRecording]);
 
   // Accusation panel state
   const [showAccuse, setShowAccuse] = useState(false);
@@ -100,9 +169,8 @@ const INITIAL_GREETINGS: Record<string, string> = {
     audio.play().catch(e => console.error("Audio playback failed:", e));
   };
 
-  async function sendMessage(e: FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
+  async function handleSend(textToSend: string) {
+    const text = textToSend.trim();
     if (!text || loading) return;
 
     setMessages((prev) => [...prev, { role: "player", content: text }]);
@@ -371,12 +439,26 @@ const INITIAL_GREETINGS: Record<string, string> = {
 
         {/* Input row */}
         <div style={styles.inputRow}>
-          <form onSubmit={sendMessage} style={styles.form}>
+          <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }} style={styles.form}>
+            {recognitionRef.current && (
+              <button
+                type="button"
+                onClick={toggleRecording}
+                style={{
+                  ...styles.micBtn,
+                  ...(isRecording ? styles.micBtnRecording : {}),
+                }}
+                disabled={loading || accuseLoading || showAccuse}
+                title={isRecording ? "Stop recording" : "Start speaking"}
+              >
+                {isRecording ? "🔴" : "🎤"}
+              </button>
+            )}
             <input
               style={styles.input}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask your question..."
+              placeholder={isRecording ? "Listening..." : "Ask your question..."}
               disabled={loading || accuseLoading || showAccuse}
               autoFocus={!showAccuse}
             />
@@ -628,5 +710,23 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     maxWidth: 120,
     textAlign: "center",
+  },
+  micBtn: {
+    background: "#1e1508",
+    border: "1px solid #4a3a10",
+    borderRadius: 6,
+    color: "#a08040",
+    cursor: "pointer",
+    padding: "8px 12px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 16,
+    transition: "background 0.2s, color 0.2s",
+  },
+  micBtnRecording: {
+    background: "#4a1c1c",
+    borderColor: "#cc4444",
+    color: "#ff9999",
   },
 };
