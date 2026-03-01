@@ -114,9 +114,10 @@ const MAP_SCALE = 0.8;
 const MAP_WIDTH = Math.round(3200 * MAP_SCALE);
 const MAP_HEIGHT = Math.round(2400 * MAP_SCALE);
 const PLAYER_SPEED = 250;
-// Sprite is 48×48 px at 1.28× scale = 61.4 px — use half that as the boundary margin
-const PLAYER_WIDTH = Math.round(76 * MAP_SCALE);
-const PLAYER_HEIGHT = Math.round(76 * MAP_SCALE);
+// Collision box is intentionally narrower than the visual sprite so the player
+// can pass through door gaps. Door is ~64 px wide; keep player box well under that.
+const PLAYER_WIDTH = Math.round(36 * MAP_SCALE);
+const PLAYER_HEIGHT = Math.round(36 * MAP_SCALE);
 // Grid constants for the layout
 const GRID_COLS = 5;
 const GRID_ROWS = 4;
@@ -288,7 +289,9 @@ interface WallRect {
 }
 
 const WALL_THICKNESS = Math.round(16 * MAP_SCALE);
-const DOOR_WIDTH = Math.round(60 * MAP_SCALE);
+// Door must be wider than the player collision box (PLAYER_WIDTH = ~61 px) so the
+// player can actually pass through. Use 80 px to give comfortable clearance.
+const DOOR_WIDTH = Math.round(80 * MAP_SCALE);
 
 /**
  * Build wall segments for a rectangular building.
